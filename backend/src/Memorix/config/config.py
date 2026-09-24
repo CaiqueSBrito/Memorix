@@ -2,3 +2,4 @@
 
 class ConfigLaya:
     language = "multilingual"
+
