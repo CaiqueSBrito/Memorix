@@ -1,2 +1,43 @@
-venv
+# Environments
+venv/
+.venv/
+env/
 .env
+.env.*
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Distribution / build
+build/
+dist/
+.next/
+.nuxt/
+.turbo/
+coverage/
+
+# Node / JS
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Project-specific
+.omp/
+omp/
