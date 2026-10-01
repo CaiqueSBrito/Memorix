@@ -1,0 +1,23 @@
+1. Sistema Solar
+
+O Sistema Solar é formado pelo Sol e por todos os corpos que orbitam ao seu redor por efeito da gravidade. Entre eles estão os oito planetas, os planetas anões, os satélites naturais, os asteroides e os cometas.
+
+1.1 Planetas rochosos
+
+Os planetas rochosos ficam na região interna do sistema e têm superfície sólida:
+
+- Mercúrio, o menor de todos e o mais próximo do Sol
+- Vênus, com atmosfera densa de gás carbônico
+- Terra, o único com água líquida estável na superfície
+- Marte, marcado por vulcões extintos e por calotas polares
+
+1.2 Comparação de distâncias
+
+A tabela abaixo traz, para cada planeta rochoso, a distância média até o Sol em unidades astronômicas e o período de revolução em dias terrestres:
+
+| Mercúrio | 0,39 | 88 dias |
+| Vênus | 0,72 | 225 dias |
+| Terra | 1,00 | 365 dias |
+| Marte | 1,52 | 687 dias |
+
+Repare que o período cresce bem mais depressa do que a distância, relação que Kepler descreveu na terceira lei do movimento planetário.

@@ -1,0 +1,17 @@
+# Fotossíntese
+
+A fotossíntese é o processo pelo qual organismos clorofilados convertem energia luminosa em energia química. Ela sustenta quase toda a cadeia alimentar do planeta e responde pela manutenção do oxigênio na atmosfera.
+
+Nos vegetais superiores o processo ocorre nos cloroplastos, organelas que contêm clorofila, o pigmento verde capaz de absorver luz nas faixas do azul e do vermelho e de refletir a faixa que enxergamos.
+
+## Etapa fotoquímica
+
+Na etapa fotoquímica, também chamada de fase clara, a luz incide sobre os fotossistemas presentes na membrana dos tilacoides. A água é quebrada num processo chamado fotólise, que libera oxigênio, elétrons e prótons.
+
+Os elétrons percorrem a cadeia transportadora e a energia liberada nesse percurso é usada para produzir ATP e NADPH, as duas moléculas que alimentam a etapa seguinte do processo.
+
+## Etapa química
+
+A etapa química, antes chamada de fase escura, não depende diretamente da luz. Nela o gás carbônico é incorporado a um açúcar de cinco carbonos pela enzima rubisco, no conjunto de reações conhecido como ciclo de Calvin.
+
+O produto final é a glicose, que serve de combustível imediato e também de matéria-prima para a construção das demais moléculas orgânicas da planta.

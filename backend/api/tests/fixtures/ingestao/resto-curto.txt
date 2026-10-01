@@ -1,0 +1,9 @@
+# Camadas da Terra
+
+A Terra é dividida em três camadas principais: a crosta, o manto e o núcleo. A crosta é a camada mais fina de todas e é sobre ela que vivemos; sua espessura varia de poucos quilômetros sob os oceanos a dezenas de quilômetros sob as grandes cadeias de montanhas. O manto concentra a maior parte do volume do planeta e é formado por rochas que, embora sólidas, se deformam lentamente ao longo de milhões de anos, e é esse escoamento lento que movimenta as placas tectônicas sobre as quais os continentes repousam. O núcleo, formado sobretudo de ferro e níquel, é a região mais interna e mais quente, dividido em uma porção externa líquida, responsável pelo campo magnético terrestre, e uma porção interna sólida, mantida nesse estado pela pressão altíssima. As rochas da crosta oceânica são mais densas que as da crosta continental, e essa diferença de densidade explica por que os continentes se mantêm acima do nível do mar enquanto o fundo do oceano permanece submerso. A fronteira entre a crosta e o manto recebe o nome de descontinuidade de Mohorovicic, identificada no começo do século vinte a partir da mudança brusca de velocidade das ondas que atravessam essa profundidade. As ondas primárias, as ondas P, são ondas de compressão e atravessam tanto sólidos quanto líquidos, enquanto as ondas secundárias, as ondas S, só se propagam em meios sólidos; foi o desaparecimento das ondas S do outro lado do planeta, registrado por estações sismográficas distantes do epicentro de grandes terremotos, que revelou a região externa do núcleo em estado líquido, muito antes de qualquer perfuração alcançar profundidades comparáveis.
+
+O estudo dessas camadas depende quase todo da propagação das ondas sísmicas.
+
+## Observação
+
+O núcleo interno é sólido, apesar da temperatura altíssima.
