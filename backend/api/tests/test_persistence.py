@@ -5,103 +5,20 @@ Roda da raiz do repo contra o banco de dev do `.env` (autorizado, gate 1 resp. 0
 
 Tudo é observado de fora, com SQL cru via `text()`. Da implementação, só a URL do
 banco é importada (`providers.database.DATABASE_URL`, montada a partir das variáveis
-`DB_*` do `.env`). A fixture de sessão roda `alembic upgrade head` no setup e
-`alembic downgrade base` no teardown. As inserções ficam numa transação desfeita no
-fim de cada teste. Nenhuma mensagem de erro exibe URL, senha ou host.
+`DB_*` do `.env`). As fixtures de banco e o mascaramento de segredo moram em
+`conftest.py` desde 2026-10-01 (decisão do humano, "Mover para o conftest.py, escopo
+session"): a fixture de sessão roda `alembic upgrade head` no setup e `alembic
+downgrade base` no teardown. As inserções ficam numa transação desfeita no fim de
+cada teste. Nenhuma mensagem de erro exibe URL, senha ou host.
 """
 
-import os
-from contextlib import contextmanager
-from pathlib import Path
-
 import pytest
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import create_engine, text
+from conftest import ALEMBIC_INI, ROOT, _alembic, _db_url, _secrets
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
-ROOT = Path(__file__).resolve().parents[3]
-ALEMBIC_INI = "backend/api/alembic.ini"  # relativo à raiz (cwd)
 SHA_A = "a" * 64
 SHA_B = "b" * 64
-
-
-def _db_url():
-    """URL do banco vinda da implementação (lê o `.env`); import tardio para o teste coletar sem ela."""
-    from backend.src.Memorix.providers.database import DATABASE_URL
-
-    return DATABASE_URL
-
-
-def _secrets():
-    u = _db_url()
-    return [s for s in (u.render_as_string(hide_password=False), u.password, u.host, os.getenv("DB_PASSWORD")) if s]
-
-
-@contextmanager
-def _no_secrets_in_errors():
-    """Reemite qualquer erro com URL/senha/host mascarados (critério: nada em log)."""
-    try:
-        yield
-    except Exception as e:  # noqa: BLE001 — só re-embala a mensagem
-        msg = f"{type(e).__name__}: {e}"
-        for s in _secrets():
-            msg = msg.replace(s, "***")
-        raise RuntimeError(msg) from None
-
-
-def _alembic(action):
-    cfg = Config(ALEMBIC_INI)
-    with _no_secrets_in_errors():
-        if action == "upgrade":
-            command.upgrade(cfg, "head")
-        else:
-            command.downgrade(cfg, "base")
-
-
-# ---------------------------------------------------------------- fixtures
-
-
-@pytest.fixture(scope="session")
-def engine():
-    if not (ROOT / ALEMBIC_INI).is_file():
-        pytest.fail(f"{ALEMBIC_INI} não existe: migração 0001 ainda não implementada")
-    assert _db_url(), "URL do banco ausente no .env"
-    eng = create_engine(_db_url(), pool_pre_ping=True)
-    yield eng
-    eng.dispose()
-
-
-@pytest.fixture(scope="session")
-def migrated(engine):
-    old_cwd = os.getcwd()
-    os.chdir(ROOT)
-    try:
-        with _no_secrets_in_errors(), engine.connect() as c:
-            docs, chunks, ver = c.execute(
-                text(
-                    "select to_regclass('public.documents'), to_regclass('public.chunks'),"
-                    " to_regclass('public.alembic_version')"
-                )
-            ).one()
-        if (docs or chunks) and not ver:
-            pytest.fail("documents/chunks já existem fora do Alembic; nada foi apagado")
-        _alembic("upgrade")
-        yield
-        _alembic("downgrade")
-    finally:
-        os.chdir(old_cwd)
-
-
-@pytest.fixture
-def conn(engine, migrated):
-    """Conexão numa transação desfeita no fim: nada inserido persiste."""
-    with engine.connect() as c:
-        tx = c.begin()
-        try:
-            yield c
-        finally:
-            tx.rollback()
 
 
 # ---------------------------------------------------------------- helpers
