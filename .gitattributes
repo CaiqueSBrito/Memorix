@@ -1,0 +1,2 @@
+backend/api/migrations/versions/0001_documents_chunks.py text eol=lf
+backend/api/tests/test_pdf.py text eol=lf
