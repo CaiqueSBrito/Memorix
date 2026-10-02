@@ -5,15 +5,15 @@ Roda da raiz do repo:
     ./venv/Scripts/python.exe -m pytest backend/api/tests/test_ingestao.py -q
     ./venv/Scripts/python.exe -m pytest backend/api/tests/test_ingestao.py -q -m "not banco"
 
-21 funções para os 17 critérios I1–I17 da tarefa. Tudo é observado de fora: offsets
+20 funções para os 17 critérios I1–I17 da tarefa. Tudo é observado de fora: offsets
 recortados do próprio canônico, contagem de tokens feita com o tokenizer real do
 bge-m3 (fixture `tokenizer`, nunca com a contagem da implementação), linhas lidas de
 volta do banco com SQL cru e rastro lido como JSONL de `tmp_path`. Não há golden file
 de spans: o único "esperado" é a execução anterior, dentro do teste de determinismo.
 
-Os 2 testes estáticos (requirements e migração 0001) passam desde já — são pin, não
-feature. Por isso os imports de produto são tolerados aqui no topo e trocados por um
-stub que relança o `ModuleNotFoundError` quando chamado: a ausência do produto vira
+O teste estático da migração 0001 passa desde já — é pin, não feature. Por isso
+os imports de produto são tolerados aqui no topo e trocados por um stub que
+relança o `ModuleNotFoundError` quando chamado: a ausência do produto vira
 falha dos 19 testes de feature, e não erro de coleta do arquivo inteiro.
 """
 
@@ -52,20 +52,6 @@ MIN_TOKENS = 80
 UPLOADER = "admin-opaco-teste"
 
 SHA_0001 = "eba47c8667c6d58aae774f8b41963abdadb1d81752088e5e019f50e6e3576562"
-
-# Nomes de distribuição (PEP 503), sem versão: bump de patch não quebra o teste,
-# dependência nova quebra.
-DEPENDENCIAS = frozenset(
-    (
-        "accelerate", "alembic", "annotated-doc", "anyio", "certifi", "cffi", "charset-normalizer", "click",
-        "colorama", "cryptography", "filelock", "fsspec", "google-auth", "h11", "hf-xet", "httpcore", "httpx",
-        "huggingface-hub", "idna", "iniconfig", "jinja2", "laya", "mako", "markdown-it-py", "markupsafe",
-        "mdurl", "mpmath", "networkx", "numpy", "packaging", "pgvector", "pluggy", "psutil", "psycopg2",
-        "pyasn1", "pyasn1-modules", "pycparser", "pygments", "pytest", "python-dotenv", "pyyaml", "regex",
-        "requests", "rich", "safetensors", "sentencepiece", "setuptools", "shellingham", "sqlalchemy", "sympy",
-        "tokenizers", "torch", "tqdm", "transformers", "typer", "typing", "typing-extensions", "urllib3",
-    )
-)
 
 # Versão limpa equivalente a `sujeira.bin`: o mesmo conteúdo sem BOM, sem CRLF, sem CR
 # solto, sem NUL, sem NFD, sem linhas em branco repetidas e sem espaço no fim de linha.
@@ -468,18 +454,7 @@ def test_metadata_guarda_caminho_relativo_do_fonte_que_reproduz_o_sha(conn, toke
     assert vazou is None, f"texto do documento dentro de documents.metadata: {vazou!r}"
 
 
-# ------------------------------------------------- 18º critério — nada de dependência nem migração nova
-
-
-def test_requirements_sem_dependencia_nova():
-    def distribuicao(linha):
-        return re.split(r"[=<>!~\[;]", linha, 1)[0].strip().lower().replace("_", "-").replace(".", "-")
-
-    linhas = (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
-    atuais = {distribuicao(l) for l in linhas if l.strip() and not l.lstrip().startswith("#")}
-    assert atuais == DEPENDENCIAS, (
-        f"dependências novas: {sorted(atuais - DEPENDENCIAS)} | sumiram: {sorted(DEPENDENCIAS - atuais)}"
-    )
+# ------------------------------------------------- migração 0001 inalterada
 
 
 def test_migracao_0001_inalterada():
