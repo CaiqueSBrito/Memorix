@@ -31,8 +31,10 @@ def ingerir(
     fonte: str | Path,
     doc_id: int | None = None,
     session: Session | None = None,
+    trace_id: str | None = None,
+    extrator: str | None = None,
 ) -> Resultado:
-    trace_id = str(uuid4())
+    trace_id = trace_id or str(uuid4())
     inicio = monotonic()
     caminho = Path(fonte)
     sessao_propria = session is None
@@ -90,7 +92,7 @@ def ingerir(
         trace_id, "ingestao", status="ok", erro=None, duracao_ms=(monotonic() - inicio) * 1000,
         doc_id=resultado_final.doc_id, doc_sha256=sha,
         origem={"tipo": source_type, "arquivo": caminho.name}, tamanho=len(canonico),
-        extrator=Config.extrator, resultado=resultado,
+        extrator=extrator or Config.extrator, resultado=resultado,
     )
     registrar(
         trace_id, "chunking", status="ok", erro=None, duracao_ms=duracao_chunking_ms,
