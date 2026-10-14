@@ -35,7 +35,7 @@ ALEMBIC_INI = "backend/api/alembic.ini"  # relativo à raiz (cwd)
 TOKENIZER = "BAAI/bge-m3"
 TOKENIZER_REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
 
-_COMANDO_CACHE = (
+_CACHE_COMMAND = (
     './venv/Scripts/python.exe -c "from huggingface_hub import snapshot_download; '
     f"snapshot_download('{TOKENIZER}', revision='{TOKENIZER_REVISION}', allow_patterns="
     "['tokenizer.json','tokenizer_config.json','sentencepiece.bpe.model',"
@@ -129,7 +129,7 @@ def conn(engine, migrated):
             tx.rollback()
 
 
-def _sessao(conn):
+def _test_session(conn):
     """Sessão ORM presa à conexão do teste: o commit da ingestão vira SAVEPOINT e some no rollback.
 
     Sem isto a ingestão abriria a própria conexão e não enxergaria a constraint
@@ -149,12 +149,12 @@ def tokenizer():
     try:
         return AutoTokenizer.from_pretrained(TOKENIZER, revision=TOKENIZER_REVISION, local_files_only=True)
     except OSError:
-        pytest.skip(f"tokenizer {TOKENIZER}@{TOKENIZER_REVISION[:7]} fora do cache local. Popule com:\n{_COMANDO_CACHE}")
+        pytest.skip(f"tokenizer {TOKENIZER}@{TOKENIZER_REVISION[:7]} fora do cache local. Popule com:\n{_CACHE_COMMAND}")
 
 
 @pytest.fixture
-def rastro(tmp_path, monkeypatch):
+def trace_file(tmp_path, monkeypatch):
     """Redireciona o JSONL de rastro para um arquivo descartável deste teste."""
-    caminho = tmp_path / "rastro.jsonl"
-    monkeypatch.setenv("MEMORIX_RASTRO_PATH", str(caminho))
-    return caminho
+    path = tmp_path / "rastro.jsonl"
+    monkeypatch.setenv("MEMORIX_RASTRO_PATH", str(path))
+    return path

@@ -89,13 +89,13 @@ def _fails(c, fn, exc=IntegrityError):
 # ---------------------------------------------------------------- critérios
 
 
-def test_upgrade_head_cria_documents_e_chunks(conn):
+def test_upgrade_head_creates_documents_and_chunks(conn):
     docs, chunks = _tables(conn)
     assert docs == "documents"
     assert chunks == "chunks"
 
 
-def test_downgrade_base_remove_tabelas_e_upgrade_roda_de_novo(engine, migrated):
+def test_downgrade_removes_tables_and_upgrade_recreates_them(engine, migrated):
     _alembic("downgrade")
     with engine.connect() as c:
         assert _tables(c) == (None, None)
@@ -114,14 +114,14 @@ def test_doc_sha256_char64_not_null_unique(conn):
     _fails(conn, lambda: _insert_doc(conn, None))  # NOT NULL
 
 
-def test_source_type_aceita_so_pdf_e_texto(conn):
+def test_source_type_accepts_only_pdf_and_text(conn):
     _insert_doc(conn, SHA_A, "pdf")
     _insert_doc(conn, SHA_B, "texto")
     for bad in ("docx", "PDF", "", "txt"):
         _fails(conn, lambda bad=bad: _insert_doc(conn, "c" * 64, bad))
 
 
-def test_chunk_id_textual_pk_igual_doc_id_dois_pontos_position(conn):
+def test_chunk_id_primary_key_matches_doc_id_and_position(conn):
     pk = conn.execute(
         text(
             "select array_agg(a.attname::text) from pg_index i"
@@ -145,7 +145,7 @@ def test_chunk_id_textual_pk_igual_doc_id_dois_pontos_position(conn):
     except DBAPIError:
         sp.rollback()
     ids = conn.execute(text("select chunk_id, position from chunks where doc_id = :d"), {"d": doc}).all()
-    assert all(cid == f"{doc}:{pos}" for cid, pos in ids)
+    assert all(cid == f"{doc}:{position}" for cid, position in ids)
 
     sp = conn.begin_nested()
     try:
@@ -154,7 +154,7 @@ def test_chunk_id_textual_pk_igual_doc_id_dois_pontos_position(conn):
     except DBAPIError:
         sp.rollback()
     ids = conn.execute(text("select chunk_id, position from chunks where doc_id = :d"), {"d": doc}).all()
-    assert ids and all(cid == f"{doc}:{pos}" for cid, pos in ids)
+    assert ids and all(cid == f"{doc}:{position}" for cid, position in ids)
 
 
 def test_chunks_unique_doc_id_position(conn):
@@ -167,7 +167,7 @@ def test_chunks_unique_doc_id_position(conn):
     _fails(conn, lambda: _insert_chunk(conn, doc_a, 0), DBAPIError)
 
 
-def test_offsets_not_null_e_end_maior_que_start(conn):
+def test_offsets_are_required_and_end_exceeds_start(conn):
     for col in ("offset_start", "offset_end"):
         assert _column(conn, "chunks", col)[2] == "NO"
 
@@ -179,7 +179,7 @@ def test_offsets_not_null_e_end_maior_que_start(conn):
     _fails(conn, lambda: _insert_chunk(conn, doc, 4, start=0, end=None))
 
 
-def test_chunks_sem_embedding_nem_embedding_model(conn):
+def test_chunks_have_no_embedding_columns(conn):
     cols = set(
         conn.execute(
             text("select column_name from information_schema.columns where table_schema = 'public' and table_name = 'chunks'")
@@ -189,7 +189,7 @@ def test_chunks_sem_embedding_nem_embedding_model(conn):
     assert not {"embedding", "embedding_model"} & cols
 
 
-def test_apagar_document_apaga_chunks_on_delete_cascade(conn):
+def test_deleting_document_cascades_to_chunks(conn):
     doc = _insert_doc(conn, SHA_A)
     keep = _insert_doc(conn, SHA_B)
     _insert_chunk(conn, doc, 0)
@@ -201,7 +201,7 @@ def test_apagar_document_apaga_chunks_on_delete_cascade(conn):
     assert conn.execute(text(count), {"d": keep}).scalar_one() == 1
 
 
-def test_rls_habilitada_sem_policies(conn):
+def test_rls_enabled_without_policies(conn):
     rls = dict(
         conn.execute(
             text(
@@ -217,7 +217,7 @@ def test_rls_habilitada_sem_policies(conn):
     assert policies == 0
 
 
-def test_url_do_banco_so_no_env_sem_credencial_em_codigo():
+def test_database_url_comes_from_env_without_hardcoded_credentials():
     """Sem banco: os arquivos da implementação existem e nenhum contém URL/senha/host."""
     assert _db_url(), "URL do banco ausente no .env"
     required = [
