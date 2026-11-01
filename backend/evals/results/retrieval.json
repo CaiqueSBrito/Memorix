@@ -1,0 +1,1150 @@
+{
+  "cases": 20,
+  "indexed_documents": 17,
+  "indexed_chunks": 7158,
+  "variants": {
+    "dense": {
+      "recall_at_5": 0.3333333333333333,
+      "mrr_at_10": 0.2369047619047619,
+      "context_recall_at_30": 0.5,
+      "context_precision_at_10": 0.2369047619047619,
+      "p95_ms_one_pass": 47.00000000593718,
+      "cold_ms": 9406.000000002678,
+      "warmups_ms": [
+        46.999999991385266,
+        31.000000002677552
+      ],
+      "gate_leave_one_out": {
+        "far": 0.125,
+        "frr": 0.08333333333333333,
+        "thresholds": {
+          "ret-01": 0.5280546724918298,
+          "ret-02": 0.5280546724918298,
+          "ret-03": 0.5280546724918298,
+          "ret-04": 0.5280546724918298,
+          "ret-05": 0.5280546724918298,
+          "ret-06": 0.5280546724918298,
+          "ret-07": 0.5280546724918298,
+          "ret-08": 0.5280546724918298,
+          "ret-09": 0.5280546724918298,
+          "ret-10": 0.5280546724918298,
+          "ret-11": 0.5280546724918298,
+          "ret-12": 0.5280546724918298,
+          "ret-13": 0.5280546724918298,
+          "ret-14": 0.5280546724918298,
+          "ret-15": 0.5280546724918298,
+          "ret-16": 0.5280546724918298,
+          "ret-17": 0.5280546724918298,
+          "ret-18": 0.5280546724918298,
+          "ret-19": 0.5280546724918298,
+          "ret-20": 0.5215284688568151
+        }
+      },
+      "cases": [
+        {
+          "case_id": "ret-01",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": true,
+          "reciprocal_rank": 0.14285714285714285,
+          "context_precision": 0.14285714285714285,
+          "score": 0.6403217124843112,
+          "duration_ms": 47.00000000593718,
+          "top_chunk_ids": [
+            "6:94",
+            "6:93",
+            "6:92",
+            "6:95",
+            "6:109"
+          ]
+        },
+        {
+          "case_id": "ret-02",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.45366842630521476,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "6:255",
+            "15:19",
+            "6:29",
+            "12:307",
+            "6:34"
+          ]
+        },
+        {
+          "case_id": "ret-03",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5367348354081762,
+          "duration_ms": 46.999999991385266,
+          "top_chunk_ids": [
+            "4:89",
+            "4:81",
+            "1:84",
+            "1:86",
+            "6:93"
+          ]
+        },
+        {
+          "case_id": "ret-04",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": true,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5885786099104026,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "6:52",
+            "6:53",
+            "6:45",
+            "6:54",
+            "6:58"
+          ]
+        },
+        {
+          "case_id": "ret-05",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5734753779612597,
+          "duration_ms": 47.00000000593718,
+          "top_chunk_ids": [
+            "6:95",
+            "15:76",
+            "15:223",
+            "15:68",
+            "15:124"
+          ]
+        },
+        {
+          "case_id": "ret-06",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5627569891665581,
+          "duration_ms": 30.999999988125637,
+          "top_chunk_ids": [
+            "6:184",
+            "6:186",
+            "15:80",
+            "15:87",
+            "15:154"
+          ]
+        },
+        {
+          "case_id": "ret-07",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 1.0,
+          "context_precision": 1.0,
+          "score": 0.5606695413589478,
+          "duration_ms": 47.00000000593718,
+          "top_chunk_ids": [
+            "15:69",
+            "6:66",
+            "15:80",
+            "15:78",
+            "6:186"
+          ]
+        },
+        {
+          "case_id": "ret-08",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5463836193084717,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "9:209",
+            "3:374",
+            "3:379",
+            "11:424",
+            "2:175"
+          ]
+        },
+        {
+          "case_id": "ret-09",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 0.5,
+          "context_precision": 0.5,
+          "score": 0.6156967511357911,
+          "duration_ms": 31.999999991967343,
+          "top_chunk_ids": [
+            "11:578",
+            "11:33",
+            "11:28",
+            "8:169",
+            "8:520"
+          ]
+        },
+        {
+          "case_id": "ret-10",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5828200578689575,
+          "duration_ms": 47.00000000593718,
+          "top_chunk_ids": [
+            "11:420",
+            "8:379",
+            "4:124",
+            "4:128",
+            "11:372"
+          ]
+        },
+        {
+          "case_id": "ret-11",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 1.0,
+          "context_precision": 1.0,
+          "score": 0.5753335609833274,
+          "duration_ms": 46.000000002095476,
+          "top_chunk_ids": [
+            "11:51",
+            "11:492",
+            "11:62",
+            "11:61",
+            "11:63"
+          ]
+        },
+        {
+          "case_id": "ret-12",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 0.2,
+          "context_precision": 0.2,
+          "score": 0.5886897338998677,
+          "duration_ms": 31.999999991967343,
+          "top_chunk_ids": [
+            "13:246",
+            "13:248",
+            "13:247",
+            "13:245",
+            "13:244"
+          ]
+        },
+        {
+          "case_id": "ret-13",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.4637812376022339,
+          "duration_ms": 47.00000000593718,
+          "top_chunk_ids": [
+            "2:246",
+            "2:256",
+            "6:99",
+            "4:41",
+            "4:49"
+          ]
+        },
+        {
+          "case_id": "ret-14",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.4598599511343229,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "9:351",
+            "4:43",
+            "4:51",
+            "2:175",
+            "2:184"
+          ]
+        },
+        {
+          "case_id": "ret-15",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5215184688568152,
+          "duration_ms": 46.999999991385266,
+          "top_chunk_ids": [
+            "6:194",
+            "6:196",
+            "2:173",
+            "2:182",
+            "6:193"
+          ]
+        },
+        {
+          "case_id": "ret-16",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.4471646084536498,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "14:76",
+            "2:246",
+            "2:256",
+            "6:284",
+            "4:42"
+          ]
+        },
+        {
+          "case_id": "ret-17",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.49097262242191664,
+          "duration_ms": 47.00000000593718,
+          "top_chunk_ids": [
+            "2:100",
+            "2:102",
+            "4:519",
+            "4:522",
+            "6:96"
+          ]
+        },
+        {
+          "case_id": "ret-18",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.468590597598344,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "4:43",
+            "4:51",
+            "17:222",
+            "17:15",
+            "9:87"
+          ]
+        },
+        {
+          "case_id": "ret-19",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.4937827292810253,
+          "duration_ms": 46.999999991385266,
+          "top_chunk_ids": [
+            "13:64",
+            "17:7",
+            "8:518",
+            "17:13",
+            "13:66"
+          ]
+        },
+        {
+          "case_id": "ret-20",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5280446724918298,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "15:46",
+            "6:98",
+            "6:92",
+            "9:239",
+            "4:43"
+          ]
+        }
+      ],
+      "warm_samples": 100
+    },
+    "hybrid": {
+      "recall_at_5": 0.4166666666666667,
+      "mrr_at_10": 0.3055555555555556,
+      "context_recall_at_30": 0.75,
+      "context_precision_at_10": 0.3055555555555556,
+      "p95_ms_one_pass": 47.00000000593718,
+      "cold_ms": 30.999999988125637,
+      "warmups_ms": [
+        47.00000000593718,
+        31.000000002677552
+      ],
+      "gate_leave_one_out": {
+        "far": 0.125,
+        "frr": 0.08333333333333333,
+        "thresholds": {
+          "ret-01": 0.5280546724918298,
+          "ret-02": 0.5280546724918298,
+          "ret-03": 0.5280546724918298,
+          "ret-04": 0.5280546724918298,
+          "ret-05": 0.5280546724918298,
+          "ret-06": 0.5280546724918298,
+          "ret-07": 0.5280546724918298,
+          "ret-08": 0.5280546724918298,
+          "ret-09": 0.5280546724918298,
+          "ret-10": 0.5280546724918298,
+          "ret-11": 0.5280546724918298,
+          "ret-12": 0.5280546724918298,
+          "ret-13": 0.5280546724918298,
+          "ret-14": 0.5280546724918298,
+          "ret-15": 0.5280546724918298,
+          "ret-16": 0.5280546724918298,
+          "ret-17": 0.5280546724918298,
+          "ret-18": 0.5280546724918298,
+          "ret-19": 0.5280546724918298,
+          "ret-20": 0.5215284688568151
+        }
+      },
+      "cases": [
+        {
+          "case_id": "ret-01",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 0.25,
+          "context_precision": 0.25,
+          "score": 0.6403217124843112,
+          "duration_ms": 46.999999991385266,
+          "top_chunk_ids": [
+            "6:90",
+            "6:102",
+            "6:104",
+            "6:73",
+            "15:300"
+          ]
+        },
+        {
+          "case_id": "ret-02",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": true,
+          "reciprocal_rank": 0.16666666666666666,
+          "context_precision": 0.16666666666666666,
+          "score": 0.45366842630521476,
+          "duration_ms": 32.00000000651926,
+          "top_chunk_ids": [
+            "6:29",
+            "6:255",
+            "15:186",
+            "10:286",
+            "15:19"
+          ]
+        },
+        {
+          "case_id": "ret-03",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5367348354081762,
+          "duration_ms": 46.000000002095476,
+          "top_chunk_ids": [
+            "6:78",
+            "6:82",
+            "15:300",
+            "6:73",
+            "2:110"
+          ]
+        },
+        {
+          "case_id": "ret-04",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": true,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5885786099104026,
+          "duration_ms": 31.999999991967343,
+          "top_chunk_ids": [
+            "6:52",
+            "6:53",
+            "6:45",
+            "6:10",
+            "6:58"
+          ]
+        },
+        {
+          "case_id": "ret-05",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": true,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5734753779612597,
+          "duration_ms": 47.00000000593718,
+          "top_chunk_ids": [
+            "15:69",
+            "15:223",
+            "15:154",
+            "6:66",
+            "9:368"
+          ]
+        },
+        {
+          "case_id": "ret-06",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": true,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5627569891665581,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "6:184",
+            "6:186",
+            "15:267",
+            "6:66",
+            "15:88"
+          ]
+        },
+        {
+          "case_id": "ret-07",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 1.0,
+          "context_precision": 1.0,
+          "score": 0.5606695413589478,
+          "duration_ms": 46.999999991385266,
+          "top_chunk_ids": [
+            "15:69",
+            "2:286",
+            "2:282",
+            "2:294",
+            "2:290"
+          ]
+        },
+        {
+          "case_id": "ret-08",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5463836193084717,
+          "duration_ms": 47.00000000593718,
+          "top_chunk_ids": [
+            "9:209",
+            "9:191",
+            "9:281",
+            "11:573",
+            "3:374"
+          ]
+        },
+        {
+          "case_id": "ret-09",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 1.0,
+          "context_precision": 1.0,
+          "score": 0.6156967511357911,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "11:33",
+            "11:28",
+            "11:40",
+            "11:25",
+            "11:578"
+          ]
+        },
+        {
+          "case_id": "ret-10",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5828200578689575,
+          "duration_ms": 46.999999991385266,
+          "top_chunk_ids": [
+            "4:124",
+            "4:128",
+            "11:372",
+            "11:420",
+            "4:279"
+          ]
+        },
+        {
+          "case_id": "ret-11",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 0.25,
+          "context_precision": 0.25,
+          "score": 0.5753335609833274,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "11:50",
+            "11:109",
+            "11:118",
+            "11:51",
+            "11:129"
+          ]
+        },
+        {
+          "case_id": "ret-12",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 1.0,
+          "context_precision": 1.0,
+          "score": 0.5886897338998677,
+          "duration_ms": 47.00000000593718,
+          "top_chunk_ids": [
+            "13:244",
+            "13:248",
+            "13:243",
+            "13:245",
+            "4:374"
+          ]
+        },
+        {
+          "case_id": "ret-13",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.4637812376022339,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "2:246",
+            "2:256",
+            "6:99",
+            "4:41",
+            "4:49"
+          ]
+        },
+        {
+          "case_id": "ret-14",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.4598599511343229,
+          "duration_ms": 46.999999991385266,
+          "top_chunk_ids": [
+            "9:308",
+            "9:351",
+            "10:207",
+            "4:43",
+            "4:51"
+          ]
+        },
+        {
+          "case_id": "ret-15",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5215184688568152,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "12:19",
+            "6:194",
+            "10:50",
+            "6:196",
+            "12:103"
+          ]
+        },
+        {
+          "case_id": "ret-16",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.4471646084536498,
+          "duration_ms": 47.00000000593718,
+          "top_chunk_ids": [
+            "14:76",
+            "2:246",
+            "2:256",
+            "6:284",
+            "4:42"
+          ]
+        },
+        {
+          "case_id": "ret-17",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.49097262242191664,
+          "duration_ms": 30.999999988125637,
+          "top_chunk_ids": [
+            "2:100",
+            "2:102",
+            "4:519",
+            "4:522",
+            "6:96"
+          ]
+        },
+        {
+          "case_id": "ret-18",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.468590597598344,
+          "duration_ms": 47.00000000593718,
+          "top_chunk_ids": [
+            "9:87",
+            "9:88",
+            "9:359",
+            "4:43",
+            "9:213"
+          ]
+        },
+        {
+          "case_id": "ret-19",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.4937827292810253,
+          "duration_ms": 31.000000002677552,
+          "top_chunk_ids": [
+            "13:64",
+            "17:1",
+            "17:7",
+            "2:203",
+            "2:204"
+          ]
+        },
+        {
+          "case_id": "ret-20",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 0.5280446724918298,
+          "duration_ms": 46.999999991385266,
+          "top_chunk_ids": [
+            "9:357",
+            "9:333",
+            "9:308",
+            "15:46",
+            "9:121"
+          ]
+        }
+      ],
+      "warm_samples": 100
+    },
+    "hybrid_rerank": {
+      "recall_at_5": 0.75,
+      "mrr_at_10": 0.4652777777777778,
+      "context_recall_at_30": 0.75,
+      "context_precision_at_10": 0.4652777777777778,
+      "p95_ms_one_pass": 469.00000001187436,
+      "cold_ms": 6516.00000000326,
+      "warmups_ms": [
+        468.99999999732245,
+        468.00000000803266
+      ],
+      "gate_leave_one_out": {
+        "far": 0.125,
+        "frr": 0.0,
+        "thresholds": {
+          "ret-01": -1.822255625,
+          "ret-02": -1.822255625,
+          "ret-03": -1.822255625,
+          "ret-04": -1.822255625,
+          "ret-05": -1.822255625,
+          "ret-06": -1.822255625,
+          "ret-07": -1.822255625,
+          "ret-08": -1.822255625,
+          "ret-09": -1.822255625,
+          "ret-10": -1.822255625,
+          "ret-11": -1.822255625,
+          "ret-12": -1.822255625,
+          "ret-13": -1.822255625,
+          "ret-14": -1.822255625,
+          "ret-15": -1.822255625,
+          "ret-16": -1.822255625,
+          "ret-17": -1.822255625,
+          "ret-18": -1.822255625,
+          "ret-19": -1.822255625,
+          "ret-20": -2.96874
+        }
+      },
+      "cases": [
+        {
+          "case_id": "ret-01",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 0.3333333333333333,
+          "context_precision": 0.3333333333333333,
+          "score": 4.6640625,
+          "duration_ms": 453.9999999979045,
+          "top_chunk_ids": [
+            "6:90",
+            "6:102",
+            "6:73",
+            "6:82",
+            "6:109"
+          ]
+        },
+        {
+          "case_id": "ret-02",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 1.0,
+          "context_precision": 1.0,
+          "score": -0.31298828125,
+          "duration_ms": 452.9999999940628,
+          "top_chunk_ids": [
+            "6:30",
+            "6:29",
+            "6:255",
+            "15:65",
+            "6:10"
+          ]
+        },
+        {
+          "case_id": "ret-03",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": -0.2166748046875,
+          "duration_ms": 453.00000000861473,
+          "top_chunk_ids": [
+            "6:390",
+            "6:391",
+            "6:213",
+            "4:81",
+            "4:89"
+          ]
+        },
+        {
+          "case_id": "ret-04",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 1.0,
+          "context_precision": 1.0,
+          "score": 3.025390625,
+          "duration_ms": 468.99999999732245,
+          "top_chunk_ids": [
+            "6:50",
+            "6:10",
+            "6:54",
+            "6:52",
+            "6:53"
+          ]
+        },
+        {
+          "case_id": "ret-05",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 0.3333333333333333,
+          "context_precision": 0.3333333333333333,
+          "score": 2.390625,
+          "duration_ms": 452.9999999940628,
+          "top_chunk_ids": [
+            "15:223",
+            "15:69",
+            "15:84",
+            "9:368",
+            "15:87"
+          ]
+        },
+        {
+          "case_id": "ret-06",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 0.25,
+          "context_precision": 0.25,
+          "score": 2.638671875,
+          "duration_ms": 453.00000000861473,
+          "top_chunk_ids": [
+            "6:184",
+            "6:400",
+            "6:399",
+            "15:84",
+            "6:186"
+          ]
+        },
+        {
+          "case_id": "ret-07",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 1.0,
+          "context_precision": 1.0,
+          "score": 1.9794921875,
+          "duration_ms": 468.99999999732245,
+          "top_chunk_ids": [
+            "15:69",
+            "15:67",
+            "15:78",
+            "6:184",
+            "6:66"
+          ]
+        },
+        {
+          "case_id": "ret-08",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 3.73046875,
+          "duration_ms": 452.9999999940628,
+          "top_chunk_ids": [
+            "9:209",
+            "9:210",
+            "9:237",
+            "9:276",
+            "9:364"
+          ]
+        },
+        {
+          "case_id": "ret-09",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 1.0,
+          "context_precision": 1.0,
+          "score": 2.228515625,
+          "duration_ms": 453.00000000861473,
+          "top_chunk_ids": [
+            "11:33",
+            "11:570",
+            "8:169",
+            "11:574",
+            "11:578"
+          ]
+        },
+        {
+          "case_id": "ret-10",
+          "out_of_corpus": false,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": 3.33984375,
+          "duration_ms": 468.99999999732245,
+          "top_chunk_ids": [
+            "4:279",
+            "4:282",
+            "4:124",
+            "4:128",
+            "11:372"
+          ]
+        },
+        {
+          "case_id": "ret-11",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 0.3333333333333333,
+          "context_precision": 0.3333333333333333,
+          "score": 2.93359375,
+          "duration_ms": 467.99999999348074,
+          "top_chunk_ids": [
+            "11:50",
+            "11:62",
+            "11:51",
+            "11:492",
+            "11:63"
+          ]
+        },
+        {
+          "case_id": "ret-12",
+          "out_of_corpus": false,
+          "hit_at_5": true,
+          "hit_at_30": true,
+          "reciprocal_rank": 0.3333333333333333,
+          "context_precision": 0.3333333333333333,
+          "score": 6.421875,
+          "duration_ms": 422.0000000059372,
+          "top_chunk_ids": [
+            "13:245",
+            "13:248",
+            "13:244",
+            "13:247",
+            "13:246"
+          ]
+        },
+        {
+          "case_id": "ret-13",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": -7.16015625,
+          "duration_ms": 375.0,
+          "top_chunk_ids": [
+            "4:43",
+            "4:51",
+            "2:175",
+            "2:184",
+            "10:360"
+          ]
+        },
+        {
+          "case_id": "ret-14",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": -8.34375,
+          "duration_ms": 452.9999999940628,
+          "top_chunk_ids": [
+            "4:79",
+            "4:87",
+            "9:308",
+            "6:391",
+            "13:180"
+          ]
+        },
+        {
+          "case_id": "ret-15",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": -7.0078125,
+          "duration_ms": 453.00000000861473,
+          "top_chunk_ids": [
+            "6:392",
+            "12:206",
+            "6:366",
+            "5:144",
+            "6:391"
+          ]
+        },
+        {
+          "case_id": "ret-16",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": -6.6796875,
+          "duration_ms": 453.9999999979045,
+          "top_chunk_ids": [
+            "4:41",
+            "4:49",
+            "4:42",
+            "4:50",
+            "7:350"
+          ]
+        },
+        {
+          "case_id": "ret-17",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": -5.37109375,
+          "duration_ms": 217.99999999348074,
+          "top_chunk_ids": [
+            "4:404",
+            "4:408",
+            "17:41",
+            "6:79",
+            "6:96"
+          ]
+        },
+        {
+          "case_id": "ret-18",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": -4.859375,
+          "duration_ms": 453.00000000861473,
+          "top_chunk_ids": [
+            "9:289",
+            "9:356",
+            "9:297",
+            "9:88",
+            "9:311"
+          ]
+        },
+        {
+          "case_id": "ret-19",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": -2.96875,
+          "duration_ms": 218.99999999732245,
+          "top_chunk_ids": [
+            "13:64",
+            "13:75",
+            "3:388",
+            "3:391",
+            "13:66"
+          ]
+        },
+        {
+          "case_id": "ret-20",
+          "out_of_corpus": true,
+          "hit_at_5": false,
+          "hit_at_30": false,
+          "reciprocal_rank": 0,
+          "context_precision": 0.0,
+          "score": -1.822265625,
+          "duration_ms": 468.99999999732245,
+          "top_chunk_ids": [
+            "9:333",
+            "14:109",
+            "15:113",
+            "9:357",
+            "9:309"
+          ]
+        }
+      ],
+      "warm_samples": 100
+    }
+  }
+}

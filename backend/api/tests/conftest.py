@@ -158,3 +158,11 @@ def trace_file(tmp_path, monkeypatch):
     path = tmp_path / "rastro.jsonl"
     monkeypatch.setenv("MEMORIX_RASTRO_PATH", str(path))
     return path
+
+
+@pytest.fixture(autouse=True)
+def local_item_review(monkeypatch):
+    """Isolate the local-model boundary; rejection tests override its verdict."""
+    from backend.src.Memorix.providers import generation
+
+    monkeypatch.setattr(generation, "check_item", lambda *args: True)
