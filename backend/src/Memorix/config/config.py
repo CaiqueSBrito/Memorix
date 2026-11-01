@@ -5,6 +5,7 @@ class ConfigLaya:
     model = {
         "multilingual": "Riupul/laya-multilingual-finetuning-memorix"
     }
+    revision = "a200a32c9c4859d9ec5ed84a8a160465ec2dcb5b"
 
 
 class ConfigIngestao:
