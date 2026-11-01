@@ -38,7 +38,4 @@ Thumbs.db
 # Logs
 *.log
 backend/logs/
-
-# Project-specific
-.omp/
-omp/
+backend/uploads/
