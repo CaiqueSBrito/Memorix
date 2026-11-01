@@ -70,12 +70,15 @@ def _extract_with_metadata(path: Path) -> tuple[str, list[dict[str, object]]]:
                     content = ocr_result.stdout.strip()
                     method = {"pagina": index + 1, "metodo": "ocr", "motor": ocr[1], "idioma": "por"}
                 if not content:
-                    raise ValueError(f"Página {index + 1} sem texto legível após extração/OCR")
-                pages.append(content)
+                    method["metodo"] = "vazio"
+                else:
+                    pages.append(content)
                 methods.append(method)
     finally:
         if renderer is not None:
             renderer.close()
+    if not pages:
+        raise ValueError("PDF sem texto legível após extração/OCR")
     return "\n\n".join(pages), methods
 
 
@@ -87,11 +90,11 @@ def extract_pdf(path: str | Path) -> str:
 
 def ingest_pdf(
     path: str | Path, *, title: str, uploaded_by: str,
-    doc_id: int | None = None, session: Session | None = None,
+    doc_id: int | None = None, session: Session | None = None, trace_id: str | None = None,
 ) -> Resultado:
     """Extrai integralmente antes de tocar no banco; compartilha o trace da 004."""
     start = monotonic()
-    trace_id = str(uuid4())
+    trace_id = trace_id or str(uuid4())
     source = Path(path)
     try:
         if source.is_absolute() or ".." in source.parts:

@@ -60,6 +60,27 @@ def test_pdf_extracts_pages_in_order_without_mixing_text(fixture_name):
     assert pages[0] != pages[1]
 
 
+def test_pdf_skips_empty_pages_but_rejects_empty_document(tmp_path):
+    from pypdf import PdfReader, PdfWriter
+
+    source = PdfReader(str(FIXTURES / "selecionavel.pdf"))
+    writer = PdfWriter()
+    writer.add_page(source.pages[0])
+    writer.add_blank_page(width=72, height=72)
+    writer.add_page(source.pages[1])
+    mixed_path = tmp_path / "com-pagina-vazia.pdf"
+    with mixed_path.open("wb") as output:
+        writer.write(output)
+    assert extract_pdf(mixed_path).split("\n\n") == NATIVE_TEXT
+
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    blank_path = tmp_path / "so-vazio.pdf"
+    with blank_path.open("wb") as output:
+        writer.write(output)
+    with pytest.raises(ValueError, match="sem texto"):
+        extract_pdf(blank_path)
+
 @pytest.mark.parametrize("fixture_name", ("invalido.pdf", "protegido.pdf"))
 def test_unreadable_pdf_fails_without_invented_text(fixture_name):
     with pytest.raises(ValueError):
