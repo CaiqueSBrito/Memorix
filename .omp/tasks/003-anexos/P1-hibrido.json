@@ -1,0 +1,204 @@
+{
+ "pergunta": "P1 — Denso só ou híbrido (denso + lexical)? Se híbrido, qual lexical (FTS portuguese do Postgres, sparse do BGE-M3 ou BM25/pg_search) e como fundir as listas.",
+ "opcoes": [
+  {
+   "nome": "(1) Denso só (baseline)",
+   "descricao": "Só o ramo vetorial (pgvector, `ORDER BY embedding <=> q LIMIT n`). Zero peça nova além do que P2/P6 já exigem.",
+   "qualidade_ptbr": "Depende do modelo de P2. Em PT-BR nativo (Quati, 10M trechos, nDCG@10), E5-large sozinho = 0,5563; com fusão RRF com um lexical aprendido (SPLADE pt-BR) = 0,6272 (+7,1 pts). Ou seja, o denso sozinho deixa ganho na mesa. Ponto fraco conhecido [INFERÊNCIA para o nosso acervo]: siglas, nomes próprios, números/leis e termos raros que o aluno cita literalmente da apostila. O BEIR mostra que o BM25 é baseline robusto fora do domínio e que modelos densos muitas vezes perdem para ele.",
+   "latencia": "Busca exata em ~10 mil trechos: dezenas de ms no máximo [INFERÊNCIA; P6 mede]. Não acrescenta nada.",
+   "recursos": "Só o do modelo denso (P2). Nenhum custo lexical.",
+   "licenca": "pgvector: licença PostgreSQL (github.com/pgvector/pgvector).",
+   "custo": "US$ 0 além do embedding (P2).",
+   "lgpd": "Nada novo além do que P2 decidir (API × local).",
+   "compat_pgvector_supabase": "Total (já decidido).",
+   "fontes": [
+    "https://arxiv.org/html/2404.06976",
+    "https://arxiv.org/abs/2104.08663",
+    "https://github.com/pgvector/pgvector"
+   ]
+  },
+  {
+   "nome": "(2) Híbrido denso + FTS do Postgres (config custom `pt_unaccent`) com RRF k=60 — RECOMENDADA",
+   "descricao": "Coluna `tsv tsvector GENERATED ... STORED` + GIN. Config própria: dicionário `simple` com stopwords `portuguese` e Accept=false, depois `unaccent`, depois `portuguese_stem` (Snowball). A consulta vira tsquery em OR (`plainto_tsquery` com `&` trocado por `|`), ordenada por `ts_rank_cd`. Os dois ramos (top-30 cada) são fundidos por RRF (1/(k+rank), k=60, pesos 1:1) numa única query com CTEs. É o padrão documentado pelo Supabase (hybrid_search) e pelo pgvector.",
+   "qualidade_ptbr": "Onde o lexical ajuda: sigla (DNA, PIB, ECA), nome próprio (Getúlio Vargas, Mendel), fórmula/número (CO2, H2O e 1822 são tokens numword/uint e passam pelo dicionário `simple`, então casam exatamente), termo técnico raro e frase copiada da apostila. Com unaccent, consulta sem acento (\"fotossintese\", \"celulas\", \"acido\") casa com texto acentuado. Medi com o stemmer Snowball PT (snowballstemmer 3.1.1 em memória, 0 divergências contra os 32.016 pares oficiais): a config `portuguese` pura FALHA em todas as consultas sem acento, e `unaccent`+stem acerta. Evidência externa: fusão RRF com lexical dá +7 pts de nDCG@10 em PT-BR (Quati, com SPLADE). Mas `ts_rank`/`ts_rank_cd` NÃO usam informação global (sem IDF, segundo a doc do Postgres), então o ganho tende a ser menor que com BM25/SPLADE [INFERÊNCIA]. O RRF ignora a escala dos scores e bateu o melhor sistema individual e o Condorcet em 4–5% em média (Cormack 2009; k=60 'não crítico').",
+   "latencia": "GIN em ~10 mil trechos mais o join RRF: poucos ms a mais [INFERÊNCIA; medir p95 na 007]. Não chama modelo extra.",
+   "recursos": "Nenhuma VRAM. Disco: coluna tsvector + índice GIN, na ordem de MB para 10 mil trechos [INFERÊNCIA].",
+   "licenca": "Postgres core e contrib `unaccent` (licença PostgreSQL). `unaccent` é extensão 'trusted': dispensa superuser.",
+   "custo": "US$ 0 (roda dentro do Postgres). Independe do modelo denso: funciona com denso local ou via API.",
+   "lgpd": "Nenhum terceiro novo. A consulta do aluno só é processada no Supabase, que já é operador dos dados. O tsvector guarda lexemas do material do admin, não dado de aluno. No log vai só o hash da consulta (regra de rastreabilidade).",
+   "compat_pgvector_supabase": "Alta. O padrão hybrid_search (tsvector + GIN + RRF em SQL) está documentado pelo Supabase. `CREATE TEXT SEARCH DICTIONARY/CONFIGURATION` não exige superuser (quem cria vira dono). Usa só templates e arquivos que já vêm no Postgres (stopwords `portuguese`, `unaccent.rules`), sem arquivo custom em $SHAREDIR, o que não é possível num Supabase gerenciado [INFERÊNCIA]. No Supabase o `unaccent` fica no schema `extensions` [INFERÊNCIA; P6 confirma]. SQLAlchemy 2.x já expõe TSVECTOR/REGCONFIG no dialeto postgresql (verificado no venv).",
+   "fontes": [
+    "https://supabase.com/docs/guides/ai/hybrid-search",
+    "https://github.com/pgvector/pgvector#hybrid-search",
+    "https://raw.githubusercontent.com/pgvector/pgvector-python/master/examples/hybrid_search/rrf.py",
+    "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "https://www.postgresql.org/docs/current/textsearch-controls.html",
+    "https://www.postgresql.org/docs/current/textsearch-dictionaries.html",
+    "https://www.postgresql.org/docs/current/unaccent.html",
+    "https://www.postgresql.org/docs/current/textsearch-tables.html",
+    "https://www.postgresql.org/docs/current/textsearch-parsers.html",
+    "https://www.postgresql.org/docs/current/sql-createtsdictionary.html",
+    "https://www.postgresql.org/docs/current/sql-createtsconfig.html",
+    "https://snowballstem.org/algorithms/portuguese/stemmer.html",
+    "https://arxiv.org/html/2404.06976"
+   ]
+  },
+  {
+   "nome": "(3) Híbrido denso + sparse do BGE-M3 (sparsevec do pgvector)",
+   "descricao": "O BGE-M3 devolve, na mesma passada do denso, pesos lexicais aprendidos por token XLM-R. O model card fala em obter pesos 'without any additional cost'. Eles vão para `sparse sparsevec(250002)` (vocab_size do config) e a busca é por produto interno `<#>`. Fusão por RRF (igual à opção 2) ou por soma ponderada, como no paper. Só existe se P2 escolher o BGE-M3: segundo P2, nenhum outro candidato local tem saída sparse.",
+   "qualidade_ptbr": "Os pesos aprendidos superam o BM25 com o mesmo tokenizer (Tabela 11 do paper). MIRACL (18 línguas, sem pt), nDCG@10 médio: denso 69,2 → denso+sparse 70,4 (+1,2). MLDR pt (documentos longos): denso 74,4 → denso+sparse 86,0, com BM25 a 82,6. É domínio de doc longo, não de chunk de ~300 tokens. Riscos: o sparse opera sobre subpalavras XLM-R, que diferenciam acento e caixa, então 'educacao' × 'educação' viram tokens diferentes e o problema de acento continua sem normalização [INFERÊNCIA, não testado]. E prende o índice lexical ao modelo: trocar o modelo exige reindexar o sparse.",
+   "latencia": "Codificar é custo zero adicional (mesma passada). Busca exata em sparsevec com 10 mil trechos: poucos ms [INFERÊNCIA].",
+   "recursos": "O do BGE-M3 (568M; checkpoint pytorch_model.bin de 2,27 GB; fp16 cabe na 4050 segundo P4/P2). Mais `sparse_linear.pt` (3,5 KB). Armazenamento: 8·nnz+16 bytes por vetor; com ~300 nnz, ~2,4 KB por trecho, ~24 MB em 10 mil [cálculo].",
+   "licenca": "BGE-M3: MIT (model card). FlagEmbedding seria dependência nova, ou código próprio do head sparse [INFERÊNCIA sobre o esforço].",
+   "custo": "US$ 0 local. Via API: os provedores comerciais de P2 (OpenAI/Cohere/Voyage/Gemini) só devolvem denso [INFERÊNCIA; P2 confirma], então não existe equivalente em API.",
+   "lgpd": "Local: nenhum terceiro novo.",
+   "compat_pgvector_supabase": "`sparsevec` existe desde o pgvector 0.7.0. Até 1e9 dimensões e 16.000 nnz armazenados (SPARSEVEC_MAX_DIM/NNZ em sparsevec.h). HNSW só até 1.000 nnz, o que basta para chunks de ~300 tokens. `pgvector.sqlalchemy.SPARSEVEC` já está no venv. A versão do pgvector no Supabase fica com P6.",
+   "fontes": [
+    "https://huggingface.co/BAAI/bge-m3",
+    "https://huggingface.co/BAAI/bge-m3/raw/main/config.json",
+    "https://arxiv.org/html/2402.03216v4",
+    "https://github.com/pgvector/pgvector#sparse-vectors",
+    "https://raw.githubusercontent.com/pgvector/pgvector/master/src/sparsevec.h"
+   ]
+  },
+  {
+   "nome": "(4) BM25 nativo via pg_search (ParadeDB) — DESCARTADA",
+   "descricao": "Índice BM25 (Tantivy) dentro do Postgres, com IDF de verdade.",
+   "qualidade_ptbr": "Seria o melhor lexical do ponto de vista teórico (tem IDF). No Quati, BM25 PT puro = 0,4467 nDCG@10.",
+   "latencia": "Baixa [INFERÊNCIA].",
+   "recursos": "Extensão Rust dentro do Postgres.",
+   "licenca": "AGPL-3.0 (ParadeDB Community).",
+   "custo": "—",
+   "lgpd": "—",
+   "compat_pgvector_supabase": "INCOMPATÍVEL. O pg_search não está na lista de extensões empacotadas do Supabase (supabase/postgres nix/ext e versions.json trazem pgroonga, rum e vector, mas não pg_search). Exigiria Postgres auto-hospedado, o que conflita com a decisão Supabase. rum e pgroonga existem no Supabase, mas não trazem BM25/IDF [INFERÊNCIA] e não trazem ganho medido sobre tsvector+GIN para 10 mil trechos.",
+   "fontes": [
+    "https://github.com/paradedb/paradedb",
+    "https://github.com/supabase/postgres/tree/develop/nix/ext",
+    "https://raw.githubusercontent.com/supabase/postgres/develop/nix/ext/versions.json"
+   ]
+  },
+  {
+   "nome": "Fusão: soma ponderada de scores (alternativa ao RRF) — NÃO recomendada no MVP",
+   "descricao": "score = w1·cos + w2·lex. Exige normalizar escalas: ts_rank_cd não tem teto (a normalização 32 é 'cosmética', segundo a doc) e o cosseno fica comprimido e depende do modelo (P2/P5). Os pesos precisariam ser calibrados por modelo.",
+   "qualidade_ptbr": "Pode superar o RRF se calibrada. O BGE-M3 usa soma ponderada (0,4/0,2/0,4) entre os próprios modos, que têm escalas comparáveis. Entre cosseno e ts_rank a calibração é frágil [INFERÊNCIA].",
+   "latencia": "Igual ao RRF.",
+   "recursos": "—",
+   "licenca": "—",
+   "custo": "—",
+   "lgpd": "—",
+   "compat_pgvector_supabase": "Total.",
+   "fontes": [
+    "https://www.postgresql.org/docs/current/textsearch-controls.html",
+    "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+    "https://arxiv.org/html/2402.03216v4"
+   ]
+  }
+ ],
+ "recomendacao": {
+  "escolha": "Opção (2): híbrido denso + FTS com config custom `pt_unaccent` (stopwords → unaccent → portuguese_stem), tsquery em OR, ts_rank_cd, top-30 por ramo, fusão RRF k=60 com pesos 1:1, desempate por chunk_id. Denso-só continua como baseline da 007 e o híbrido só é adotado se passar no critério numérico abaixo.",
+  "justificativa": [
+   "Custo quase zero: ~6 comandos SQL na 0002 e uma query com CTEs. Nenhuma dependência Python nova, nenhuma VRAM, nenhum terceiro novo (LGPD neutro).",
+   "Independe do modelo de P2: funciona com denso local ou via API. A opção (3) só existe com BGE-M3 e amarra o índice lexical ao modelo.",
+   "Cobre justamente o que o denso erra em material didático: siglas, nomes, números/fórmulas, termos raros e frases copiadas da apostila. O unaccent resolve a consulta digitada sem acento, que é comum em aluno. A config `portuguese` pura falha nisso (medido com o stemmer Snowball).",
+   "O RRF não depende de escala, o que evita calibrar cosseno × ts_rank por modelo. Tem k=60 com evidência empírica (Cormack 2009) e é o padrão do Supabase e do pgvector.",
+   "A ordem stop → unaccent → stem impede que ~30 stopwords acentuadas vazem para o índice (\"nao\", \"tambem\", \"voce\", \"sao\"...), o que aconteceria se o unaccent viesse primeiro (verificado contra a stoplist Snowball)."
+  ],
+  "criterio_decisao_007": "Adotar o híbrido se, contra o denso-só com o mesmo modelo e o mesmo chunking: recall@5 ≥ +3 p.p. absolutos OU MRR@10 ≥ +0,03; sem queda >1 p.p. de recall@5 no subconjunto 'paráfrase/conceitual'; latência p95 de retrieval ≤ +20 ms; sem piora do comportamento fora do acervo (gate de P5).",
+  "alternativa_local": "A recomendada já é 100% local/no banco. Se P2 escolher o BGE-M3, a 007 pode testar o sparse como terceiro ramo (hipótese H6) sem mudar a arquitetura de fusão.",
+  "o_que_nao_fazer_agora": "Soma ponderada, variar k do RRF (Cormack: k 'não crítico'), setweight por título (depende de P3 criar campo de título), sinônimos/thesaurus (exigem arquivo em $SHAREDIR, inviável no Supabase gerenciado [INFERÊNCIA]) e pg_search."
+ },
+ "sql_fusao_esboco": "-- ESBOÇO (texto, não executado). Parâmetros ligados pelo backend: :q_text, :q_emb, :n_branch (30), :k_rrf (60), :n_out (pool para P4, ex.: 30).\nWITH q AS (\n  -- plainto_tsquery nunca interpreta operadores do usuário; trocar & por | dá recall (OR). Consulta só de stopwords -> tsquery vazia -> ramo lexical vazio.\n  SELECT replace(plainto_tsquery('public.pt_unaccent', :q_text)::text, '&', '|')::tsquery AS tsq\n),\ndense AS (\n  SELECT chunk_id, 1 - dist AS cos_sim,\n         row_number() OVER (ORDER BY dist, chunk_id) AS r\n  FROM (SELECT chunk_id, embedding <=> :q_emb AS dist\n        FROM chunks\n        ORDER BY embedding <=> :q_emb      -- forma que permite usar HNSW se P6 criar o índice\n        LIMIT :n_branch) d\n),\nlex AS (\n  SELECT chunk_id, fts,\n         row_number() OVER (ORDER BY fts DESC, chunk_id) AS r\n  FROM (SELECT c.chunk_id, ts_rank_cd(c.tsv, q.tsq) AS fts\n        FROM chunks c, q\n        WHERE c.tsv @@ q.tsq               -- usa o GIN\n        ORDER BY fts DESC, c.chunk_id\n        LIMIT :n_branch) l\n)\nSELECT coalesce(d.chunk_id, l.chunk_id) AS chunk_id,\n       d.r AS rank_dense, d.cos_sim,          -- scores brutos para o rastro e para P5 (RRF não serve de gate)\n       l.r AS rank_lex,  l.fts AS ts_rank_cd,\n       coalesce(1.0 / (:k_rrf + d.r), 0) + coalesce(1.0 / (:k_rrf + l.r), 0) AS rrf\nFROM dense d\nFULL OUTER JOIN lex l ON l.chunk_id = d.chunk_id\nORDER BY rrf DESC, chunk_id                   -- desempate determinístico (reprodutibilidade)\nLIMIT :n_out;\n\n-- Variante opção (3), só se P2 = BGE-M3: CTE adicional\n-- sparse AS (SELECT chunk_id, -dist AS ip, row_number() OVER (ORDER BY dist, chunk_id) AS r\n--            FROM (SELECT chunk_id, sparse <#> :q_sparse AS dist FROM chunks ORDER BY sparse <#> :q_sparse LIMIT :n_branch) s)\n-- somando + coalesce(1.0/(:k_rrf + s.r), 0) no RRF.\n-- Operador denso: <=> (cosseno) aqui; se P2/P6 fixarem vetores normalizados + vector_ip_ops, trocar por <#> (inner product negativo).",
+ "impacto_schema_0002": {
+  "0001_inalterada": "Sim. Nada do P1 muda documents/chunks da 0001. Tudo entra como acréscimo na 0002 e é reversível no downgrade (drop column/index/config/dictionary).",
+  "ddl_esboco": "CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA extensions;\nCREATE TEXT SEARCH DICTIONARY public.pt_stop (TEMPLATE = pg_catalog.simple, STOPWORDS = portuguese, ACCEPT = false);\nCREATE TEXT SEARCH CONFIGURATION public.pt_unaccent (COPY = pg_catalog.portuguese);\nALTER TEXT SEARCH CONFIGURATION public.pt_unaccent\n  ALTER MAPPING FOR asciiword, asciihword, hword_asciipart, word, hword, hword_part\n  WITH public.pt_stop, extensions.unaccent, pg_catalog.portuguese_stem;\nALTER TABLE chunks ADD COLUMN tsv tsvector\n  GENERATED ALWAYS AS (to_tsvector('public.pt_unaccent'::regconfig, \"text\")) STORED;\nCREATE INDEX chunks_tsv_gin ON chunks USING gin (tsv);\n-- Só se a 007 aprovar a opção (3): ALTER TABLE chunks ADD COLUMN sparse sparsevec(250002); (HNSW sparsevec_ip_ops opcional; com 10 mil trechos a busca exata basta)",
+  "notas": [
+   "Precisa ser `to_tsvector` de 2 argumentos (regconfig explícito): é imutável, requisito para GENERATED/índice (doc 12.2.2).",
+   "Mudar a config (ordem de dicionários, stopwords) exige recalcular a coluna (drop/add). A config lexical (`fts_config=pt_unaccent@v1`) deve entrar no `index_version` da regra de rastreabilidade.",
+   "Numword/uint/float (CO2, 1822, 3.14) já passam pelo `simple` na cópia da config portuguese [INFERÊNCIA: mapeamento herdado de COPY = portuguese; a doc mostra esse padrão nas configs padrão]."
+  ]
+ },
+ "hipoteses_para_007": [
+  {
+   "id": "H1-P1",
+   "hipotese": "Trocar denso-só por híbrido denso+FTS(pt_unaccent, OR, RRF k=60, 30 por ramo) melhora recall@5 em ≥ +3 p.p. sem piorar MRR@10 (queda ≤ 0,01), p95 (≤ +20 ms) nem os falsos positivos fora do acervo.",
+   "metrica": "recall@5, MRR@10, p95 ms, taxa de 'fora do acervo' respondida indevidamente"
+  },
+  {
+   "id": "H2-P1",
+   "hipotese": "No subconjunto de consultas com sigla/nome próprio/número/termo técnico raro, o híbrido melhora recall@5 em ≥ +10 p.p. sobre o denso-só. No subconjunto paráfrase/conceitual, a queda não passa de 1 p.p.",
+   "metrica": "recall@5 por tag de consulta (pede à 006 as tags: sigla_nome_numero, termo_tecnico, parafrase, sem_acento, fora_do_acervo)"
+  },
+  {
+   "id": "H3-P1",
+   "hipotese": "Com o ramo lexical isolado, trocar a config `portuguese` pela `pt_unaccent` melhora o recall@30 do ramo em consultas sem acento sem piorar as acentuadas (≤ 1 p.p.).",
+   "metrica": "recall@30 do ramo FTS por subconjunto sem_acento × acentuada"
+  },
+  {
+   "id": "H4-P1",
+   "hipotese": "Trocar a tsquery AND (websearch_to_tsquery, padrão do exemplo do Supabase) por OR aumenta o recall@5 do híbrido sem piorar o MRR@10. Com AND, perguntas longas em linguagem natural tendem a zerar o ramo lexical.",
+   "metrica": "recall@5, MRR@10, % de consultas com ramo FTS vazio"
+  },
+  {
+   "id": "H5-P1",
+   "hipotese": "(interface P4) O pool híbrido top-30 tem recall@30 ≥ o do denso top-30 + 3 p.p., ou seja, dá ao reranker mais trechos corretos para reordenar.",
+   "metrica": "recall@30 do pool antes do reranker"
+  },
+  {
+   "id": "H6-P1",
+   "hipotese": "(só se P2 = BGE-M3) Trocar o FTS pelo sparse do BGE-M3 como ramo lexical, ou somá-lo como 3º ramo no RRF, melhora recall@5 em ≥ +2 p.p. sobre denso+FTS sem piorar p95 em mais de 10 ms. Abaixo disso não justifica coluna nova nem acoplamento ao modelo.",
+   "metrica": "recall@5, MRR@10, p95"
+  }
+ ],
+ "dependencias_com_outras_perguntas": [
+  "P2: o sparse (opção 3) só existe com BGE-M3 (confirmado por P2). O FTS independe do modelo. Operador `<=>` × `<#>` depende de o modelo normalizar os vetores.",
+  "P3: o tsv é gerado de `chunks.text`, o mesmo texto do embedding. Chunks de tamanho parecido (~300 tokens, proposta de P3) tornam ts_rank_cd comparável sem normalização por comprimento. A ingestão deve desfazer hifenização de quebra de linha do PDF (\"fotos-\\nsíntese\"), senão o lexical perde o termo [INFERÊNCIA]. Se P3 criar título/seção por chunk, setweight A/B vira hipótese futura.",
+  "P4: P1 entrega um pool fundido de N≈30 (ajustável até 50) ao reranker. Com reranker, a fusão pesa menos na ordem final e mais no recall do pool (H5-P1).",
+  "P5: o score RRF só reflete posição e não serve de gate. A query devolve cos_sim e ts_rank_cd brutos por candidato (pedido de P5). Sugestão para P5 testar: 'ramo FTS vazio + cosseno top-1 baixo' como sinal auxiliar de fora do acervo.",
+  "P6: confirmar no projeto Supabase: `unaccent` disponível (schema `extensions`), permissão de CREATE TEXT SEARCH DICTIONARY/CONFIGURATION para o papel da migração, pgvector ≥ 0.7.0 (sparsevec) e ausência de pg_search (verifiquei no repositório supabase/postgres)."
+ ],
+ "inferencias": [
+  "O ganho do híbrido com ts_rank_cd (sem IDF) sobre denso-só em PT-BR didático não foi medido. As evidências são de BM25/SPLADE (Quati) e do sparse BGE-M3 (MIRACL/MLDR, domínios diferentes).",
+  "Latência do FTS e do join RRF em 10 mil trechos (poucos ms) e tamanho do tsvector/GIN (ordem de MB): estimativas.",
+  "O comportamento do stemmer no Postgres foi reproduzido com snowballstemmer 3.1.1 (Python, em memória, validado 0/32.016 contra o output oficial). O unaccent foi aproximado por remoção de diacríticos Unicode (NFD). A versão do libstemmer embutida no Postgres do Supabase pode diferir em detalhes.",
+  "Limites conhecidos do stem (medidos): função/funções → funçã/funçõ e equação/equações → equaçã/equaçõ não se unem nem com acento. Com unaccent+stem, educação/educações → educaca/educaco também deixam de se unir. Colisões: país/pais e avó/avô se fundem, casa/casado → 'cas'. O denso e o reranker compensam [INFERÊNCIA].",
+  "Stopwords da lista Snowball que colidem com siglas somem do índice: 'se' (Sergipe), 'as', 'ou', 'e', 'o', 'a', 'os', 'um' (verificado na lista). A lista `portuguese.stop` do Postgres pode diferir levemente da do site Snowball [INFERÊNCIA].",
+  "Mapeamento numword/uint→simple herdado via COPY = portuguese: inferido do padrão das configs padrão mostrado na doc, não inspecionado com \\dF+ num banco.",
+  "Disponibilidade do `unaccent` e permissões de CREATE TEXT SEARCH no Supabase gerenciado: P6 confirma. Arquivos custom em $SHAREDIR (sinônimos, regras) inviáveis no Supabase gerenciado.",
+  "O sparse do BGE-M3 diferencia acento (subpalavras XLM-R): não testado, sem download de tokenizer/modelo por restrição.",
+  "APIs comerciais não oferecem saída sparse compatível: a confirmar por P2.",
+  "A troca de '&' por '|' no texto de plainto_tsquery é segura porque os lexemas vêm entre aspas e o parser não produz '&' dentro de token. Não executado."
+ ],
+ "fontes": [
+  "https://supabase.com/docs/guides/ai/hybrid-search",
+  "https://supabase.com/docs/guides/database/full-text-search",
+  "https://supabase.com/docs/guides/database/extensions",
+  "https://github.com/supabase/postgres/tree/develop/nix/ext",
+  "https://raw.githubusercontent.com/supabase/postgres/develop/nix/ext/versions.json",
+  "https://github.com/pgvector/pgvector",
+  "https://raw.githubusercontent.com/pgvector/pgvector/master/src/sparsevec.h",
+  "https://raw.githubusercontent.com/pgvector/pgvector-python/master/examples/hybrid_search/rrf.py",
+  "https://www.postgresql.org/docs/current/textsearch-controls.html",
+  "https://www.postgresql.org/docs/current/textsearch-dictionaries.html",
+  "https://www.postgresql.org/docs/current/textsearch-tables.html",
+  "https://www.postgresql.org/docs/current/textsearch-parsers.html",
+  "https://www.postgresql.org/docs/current/textsearch-psql.html",
+  "https://www.postgresql.org/docs/current/unaccent.html",
+  "https://www.postgresql.org/docs/current/sql-createtsdictionary.html",
+  "https://www.postgresql.org/docs/current/sql-createtsconfig.html",
+  "https://snowballstem.org/algorithms/portuguese/stemmer.html",
+  "https://snowballstem.org/algorithms/portuguese/stop.txt",
+  "https://raw.githubusercontent.com/snowballstem/snowball-data/master/portuguese/voc.txt",
+  "https://raw.githubusercontent.com/snowballstem/snowball-data/master/portuguese/output.txt",
+  "https://pypi.org/project/snowballstemmer/",
+  "https://cormack.uwaterloo.ca/cormacksigir09-rrf.pdf",
+  "https://huggingface.co/BAAI/bge-m3",
+  "https://huggingface.co/BAAI/bge-m3/raw/main/config.json",
+  "https://arxiv.org/html/2402.03216v4",
+  "https://arxiv.org/html/2404.06976",
+  "https://arxiv.org/abs/2104.08663",
+  "https://github.com/paradedb/paradedb"
+ ],
+ "evidencia_executada": "Nenhum banco, modelo ou arquivo do repo foi tocado. Executei só: (a) o stemmer Snowball PT carregado em memória a partir do sdist PyPI snowballstemmer 3.1.1, validado 0 divergências em 32.016 palavras oficiais; (b) comparação de 22 pares de palavras nas cadeias 'portuguese', 'unaccent+stem' e 'stem+unaccent'; (c) interseção da stoplist Snowball com formas sem acento (30 stopwords vazariam se o unaccent viesse antes do filtro de stopwords). Leitura no venv: pgvector.sqlalchemy exporta SPARSEVEC; o dialeto postgresql do SQLAlchemy exporta TSVECTOR/REGCONFIG.",
+ "colaboracao": "Mandei o entendimento a `all` e respondi uma vez. Acordos: P5 pediu cos_sim e ts_rank brutos na saída (incluído no SQL); P4 recebe pool de 30–50; P2 confirmou que o sparse só existe no BGE-M3; P3 confirmou o tsv sobre chunks.text com chunks de ~300 tokens; P6 levantou o mesmo risco de ausência do pg_search (confirmado aqui pelo repositório supabase/postgres). Nenhuma divergência aberta.",
+ "revisao_pedagogica": "Não se aplica: nada aqui é conteúdo que o aluno estude."
+}

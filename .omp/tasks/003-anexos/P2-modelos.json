@@ -1,0 +1,422 @@
+{
+ "pergunta": "P2: quais modelos de embedding comparar para PT-BR, locais (RTX 4050 Laptop 6 GiB) e via API: dimensão, limite de tokens, licença, custo, LGPD, e o que a 007 deve medir.",
+ "resumo_executivo": "Recomendo como baseline local o BAAI/bge-m3, só com o vetor denso de 1024 dimensões. Na 0002 a coluna fica vector(1024) com distância cosseno. Para a 007 medir, proponho dois desafiantes. O local é o Qwen/Qwen3-Embedding-0.6B em 1024 dimensões: é o modelo aberto com a melhor nota de retrieval no MTEB-PT, e a coluna continua a mesma. O de API é o OpenAI text-embedding-3-large com dimensions=1024, e só entra se o humano autorizar o envio de dados a terceiros. Três opções ficam fora. A API do Gemini proíbe aplicações acessíveis a menores de 18 anos, e o público do Memorix inclui menores. O jina-embeddings-v3 tem licença CC BY-NC 4.0, que não permite uso comercial. O Serafim processa no máximo 128 tokens e tem retrieval fraco no MTEB-PT.",
+ "fatos_de_contorno": {
+  "pgvector_limites": "Limites do índice HNSW: vector até 2.000 dimensões, halfvec até 4.000, bit até 64.000 e sparsevec até 1.000 elementos não-zero. Armazenamento: vector ocupa 4*d+8 bytes e halfvec 2*d+8 bytes; os dois tipos armazenam até 16.000 dimensões. Fonte: https://github.com/pgvector/pgvector (README, seções HNSW e Reference). A P6 confirmou que o Supabase usa pgvector 0.8.2.",
+  "sqlalchemy": "O venv tem pgvector 0.5.0 com os módulos pgvector/sqlalchemy/vector.py, halfvec.py e sparsevec.py, e transformers 5.17.0, que já inclui as arquiteturas qwen3, xlm_roberta, gemma3 e deberta_v2. Verificado nos arquivos do venv.",
+  "hardware": "RTX 4050 Laptop: 6 GB GDDR6, 2.560 CUDA cores, 194 AI TOPS. Fonte: https://www.nvidia.com/en-us/geforce/laptops/40-series/. A VRAM abaixo foi estimada como parâmetros × 2 bytes (FP16/BF16) mais ativações [INFERÊNCIA para ativações e throughput].",
+  "metodo_throughput": "[INFERÊNCIA] Cálculo: FLOPs ≈ 2 × parâmetros não-embedding × tokens. Para a GPU assumi 15–20 TFLOPS FP16 efetivos, contra cerca de 48 teóricos (194 AI TOPS divididos por 4, porque o número da NVIDIA é FP8 esparso). Chunk de ~300 tokens (P3). Não foi medido; a 007 mede.",
+  "benchmarks_pt_usados": "(a) MTEB-PT (Okamura et al., 2026, https://arxiv.org/abs/2607.04071), benchmark português com 14 datasets; retrieval medido em nDCG@10. (b) Subconjuntos em português do MMTEB, lidos direto dos JSON oficiais em https://github.com/embeddings-benchmark/results (results/<modelo>/<rev>/<Tarefa>.json), main_score = nDCG@10: BelebeleRetrieval por-por, WikipediaRetrievalMultilingual pt, XPQARetrieval por-por, WebFAQRetrieval por, MultiLongDocRetrieval (MLDR) pt teste, EuroPIRQRetrieval pt, MintakaRetrieval pt. (c) Artigo do BGE-M3 (https://arxiv.org/abs/2402.03216): MKQA pt com Recall@100 e MLDR pt com nDCG@10.",
+  "custo_em_escala": "Cenário de ~10 mil trechos × ~300 tokens ≈ 3M tokens por indexação completa [suposição de volume da tarefa]. Custo de cada reindexação: OpenAI 3-small US$ 0,06; OpenAI 3-large US$ 0,39; Cohere embed-v4 US$ 0,36; Voyage-4 US$ 0,18 (dentro da franquia grátis de 200M tokens); Gemini-embedding-2 US$ 0,60. Consultas: 100 mil consultas × ~30 tokens também dão ~3M tokens. Conclusão: o custo é irrelevante; o que decide é LGPD e qualidade."
+ },
+ "opcoes": [
+  {
+   "nome": "BAAI/bge-m3 (local)",
+   "descricao": "Encoder XLM-RoBERTa-large com 568M de parâmetros (303M sem embeddings). Uma única passada devolve vetor denso, pesos lexicais esparsos e multivetor ColBERT. Pooling CLS.",
+   "dimensao": "1024 (denso), sem MRL",
+   "limite_tokens": 8192,
+   "prefixos": "Nenhum. O card diz que não precisa de instrução na query.",
+   "qualidade_ptbr": "MMTEB pt (nDCG@10): Belebele 94,2; WikiRet 88,6; EuroPIRQ 91,0. No artigo: MKQA pt R@100 denso 76,3 (mE5-large 73,5; OpenAI-3 77,5; BM25 44,9). MLDR pt nDCG@10: denso 74,4, esparso 85,2, denso+esparso 86,0, BM25 82,6. Média MMTEB (task) 59,56 e retrieval 54,60, abaixo do Qwen3-0.6B (64,64). Não foi avaliado no MTEB-PT.",
+   "latencia": "[INFERÊNCIA] Indexação na GPU: ~80–110 chunks/s, ou seja ~1,5–2 min para 10 mil trechos. Consulta isolada: ~10–25 ms na GPU, ~50–150 ms na CPU (12 threads).",
+   "recursos": "Pesos em fp32 no repositório (pytorch_model.bin com 2,27 GB), ~1,1 GB em FP16. Com ativações de lote pequeno, ~1,5–2,5 GB de VRAM [INFERÊNCIA]. Cabe na 6 GiB junto com o reranker bge-reranker-v2-m3 (568M, ~1,1 GB em FP16).",
+   "licenca": "MIT",
+   "custo": "US$ 0 (local)",
+   "lgpd": "Tudo local: nem o acervo nem as consultas saem da máquina.",
+   "compat_pgvector_supabase": "vector(1024) indexável em HNSW (<2000). O esparso poderia ir para sparsevec, e a P3 garante até 512 tokens por chunk, abaixo do limite de 1.000 não-zeros. Suporte nativo em pgvector.sqlalchemy (VECTOR/SPARSEVEC).",
+   "fontes": [
+    "https://huggingface.co/BAAI/bge-m3",
+    "https://arxiv.org/abs/2402.03216",
+    "https://github.com/embeddings-benchmark/results/tree/main/results/BAAI__bge-m3",
+    "https://huggingface.co/Qwen/Qwen3-Embedding-0.6B"
+   ]
+  },
+  {
+   "nome": "Qwen/Qwen3-Embedding-0.6B (local)",
+   "descricao": "Decoder Qwen3 com 0,6B de parâmetros (596M em BF16, 0,44B sem embeddings), pooling pelo último token, padding à esquerda. Instruction-aware.",
+   "dimensao": "1024, com MRL de 32 a 1024",
+   "limite_tokens": 32768,
+   "prefixos": "Só na query: 'Instruct: {tarefa}\\nQuery:{consulta}'. Documento sem instrução. O card recomenda escrever a instrução em inglês e relata que omiti-la custa 1–5%.",
+   "qualidade_ptbr": "No MTEB-PT tem o melhor retrieval entre modelos abertos: 78,9, contra gte-base 76,9, mE5-large 73,4, mE5-large-instruct 70,1 e mE5-base 71,7. Também tem o melhor reranking do benchmark: 85,8. MMTEB pt: Belebele 94,1; WikiRet 87,0; WebFAQ 76,3; MLDR 73,8. Média MMTEB (task) 64,33 e retrieval 64,64.",
+   "latencia": "[INFERÊNCIA] Indexação: ~55–75 chunks/s, ~2,5–3 min para 10 mil trechos. Consulta: ~15–30 ms na GPU; na CPU é mais lento que o bge-m3 (28 camadas).",
+   "recursos": "~1,2 GB em BF16/FP16 mais ativações, total ~2–3 GB [INFERÊNCIA]. Exige transformers >= 4.51 (o venv tem 5.17). flash_attention_2 é opcional.",
+   "licenca": "Apache-2.0",
+   "custo": "US$ 0 (local)",
+   "lgpd": "Tudo local.",
+   "compat_pgvector_supabase": "vector(1024): a coluna tem o mesmo formato do baseline. Com MRL dá para descer a 512/768 sem mudar o tipo.",
+   "fontes": [
+    "https://huggingface.co/Qwen/Qwen3-Embedding-0.6B",
+    "https://huggingface.co/Qwen/Qwen3-0.6B",
+    "https://arxiv.org/abs/2607.04071",
+    "https://github.com/embeddings-benchmark/results/tree/main/results/Qwen__Qwen3-Embedding-0.6B"
+   ]
+  },
+  {
+   "nome": "intfloat/multilingual-e5-large (local)",
+   "descricao": "XLM-RoBERTa-large, 560M de parâmetros, mean pooling.",
+   "dimensao": "1024, sem MRL",
+   "limite_tokens": 512,
+   "prefixos": "Obrigatórios: 'query: ' na consulta e 'passage: ' no documento. Sem eles o desempenho cai, segundo o card.",
+   "qualidade_ptbr": "MTEB-PT retrieval 73,4, reranking 83,8. MMTEB pt: Belebele 95,8; WikiRet 88,9; XPQA 41,1; WebFAQ 76,1; MLDR 58,7; EuroPIRQ 88,9. O card avisa que o cosseno fica concentrado entre 0,7 e 1,0 (temperatura 0,01), o que prejudica usar o score como limiar do gate (P5).",
+   "latencia": "[INFERÊNCIA] Parecida com o bge-m3.",
+   "recursos": "~1,1 GB em FP16.",
+   "licenca": "MIT",
+   "custo": "US$ 0",
+   "lgpd": "Local.",
+   "compat_pgvector_supabase": "vector(1024).",
+   "fontes": [
+    "https://huggingface.co/intfloat/multilingual-e5-large",
+    "https://arxiv.org/abs/2607.04071"
+   ]
+  },
+  {
+   "nome": "intfloat/multilingual-e5-large-instruct (local)",
+   "descricao": "Mesma base do e5-large, com ajuste por instrução.",
+   "dimensao": "1024",
+   "limite_tokens": 512,
+   "prefixos": "Query: 'Instruct: {tarefa}\\nQuery: {consulta}'. Documento sem instrução [INFERÊNCIA: o card mostra a instrução apenas nas queries].",
+   "qualidade_ptbr": "MTEB-PT retrieval 70,1: caiu 3 posições em relação ao MMTEB. MMTEB pt: Belebele 94,1; WikiRet 91,1; XPQA 51,2; WebFAQ 77,3; MLDR 58,3; Mintaka 35,1. Média MMTEB (task) 63,22. O cosseno também fica entre 0,7 e 1,0.",
+   "latencia": "[INFERÊNCIA] Igual ao e5-large.",
+   "recursos": "~1,1 GB em FP16 (os pesos já vêm em F16).",
+   "licenca": "MIT",
+   "custo": "US$ 0",
+   "lgpd": "Local.",
+   "compat_pgvector_supabase": "vector(1024).",
+   "fontes": [
+    "https://huggingface.co/intfloat/multilingual-e5-large-instruct",
+    "https://arxiv.org/abs/2607.04071"
+   ]
+  },
+  {
+   "nome": "intfloat/multilingual-e5-base (local)",
+   "descricao": "XLM-RoBERTa-base, 278M de parâmetros, 12 camadas.",
+   "dimensao": "768",
+   "limite_tokens": 512,
+   "prefixos": "'query: ' / 'passage: ' obrigatórios.",
+   "qualidade_ptbr": "MTEB-PT retrieval 71,7, reranking 84,5 (2º lugar em reranking). MMTEB pt: Belebele 93,4; WikiRet 87,3; XPQA 44,8; WebFAQ 75,6; MLDR 53,4; EuroPIRQ 89,1.",
+   "latencia": "[INFERÊNCIA] ~3x mais rápido que os modelos large; é a opção viável para CPU.",
+   "recursos": "~0,56 GB em FP16.",
+   "licenca": "MIT",
+   "custo": "US$ 0",
+   "lgpd": "Local.",
+   "compat_pgvector_supabase": "vector(768).",
+   "fontes": [
+    "https://huggingface.co/intfloat/multilingual-e5-base",
+    "https://arxiv.org/abs/2607.04071"
+   ]
+  },
+  {
+   "nome": "Alibaba-NLP/gte-multilingual-base (local)",
+   "descricao": "Encoder de 305M de parâmetros com código próprio (trust_remote_code). Gera denso e esparso.",
+   "dimensao": "768, elástica de 128 a 768",
+   "limite_tokens": 8192,
+   "prefixos": "Nenhum documentado [INFERÊNCIA].",
+   "qualidade_ptbr": "MTEB-PT retrieval 76,9 (3º lugar geral, 2º entre os abertos). MMTEB pt: WikiRet 82,3; XPQA 47,5; WebFAQ 70,2; MLDR 79,1.",
+   "latencia": "[INFERÊNCIA] Rápido, porte base; o card promete aceleração com xformers.",
+   "recursos": "~0,6 GB em FP16.",
+   "licenca": "Apache-2.0",
+   "custo": "US$ 0",
+   "lgpd": "Local.",
+   "compat_pgvector_supabase": "vector(768); o esparso é possível.",
+   "fontes": [
+    "https://huggingface.co/Alibaba-NLP/gte-multilingual-base",
+    "https://arxiv.org/abs/2407.19669",
+    "https://arxiv.org/abs/2607.04071"
+   ]
+  },
+  {
+   "nome": "Snowflake/snowflake-arctic-embed-l-v2.0 (local)",
+   "descricao": "Construído sobre o bge-m3-retromae: 568M de parâmetros (303M sem embeddings), pooling CLS.",
+   "dimensao": "1024, com MRL para 256",
+   "limite_tokens": 8192,
+   "prefixos": "'query: ' só na consulta.",
+   "qualidade_ptbr": "MMTEB pt: Belebele 94,1; WikiRet 89,6; XPQA 53,7 (o melhor entre os abertos); EuroPIRQ 91,1; Mintaka 32,0. No card: MIRACL(4) 55,8 contra 56,8 do bge-m3; CLEF 52,9/54,3 contra 40,8/41,3 do bge-m3. Não foi avaliado no MTEB-PT.",
+   "latencia": "[INFERÊNCIA] Igual ao bge-m3.",
+   "recursos": "~1,1 GB em FP16.",
+   "licenca": "Apache-2.0",
+   "custo": "US$ 0",
+   "lgpd": "Local.",
+   "compat_pgvector_supabase": "vector(1024).",
+   "fontes": [
+    "https://huggingface.co/Snowflake/snowflake-arctic-embed-l-v2.0",
+    "https://github.com/embeddings-benchmark/results/tree/main/results/Snowflake__snowflake-arctic-embed-l-v2.0"
+   ]
+  },
+  {
+   "nome": "jinaai/jina-embeddings-v3 (local) — DESCARTADO",
+   "descricao": "572M de parâmetros, adaptadores LoRA por tarefa, trust_remote_code.",
+   "dimensao": "1024, MRL de 32 a 1024",
+   "limite_tokens": 8192,
+   "prefixos": "task='retrieval.query' / 'retrieval.passage'.",
+   "qualidade_ptbr": "MMTEB pt: Belebele 93,6; WikiRet 88,3; WebFAQ 83,1. O português está entre os 30 idiomas priorizados.",
+   "latencia": "[INFERÊNCIA] Parecida com os modelos large.",
+   "recursos": "~1,1 GB em BF16.",
+   "licenca": "CC BY-NC 4.0. Uso fora de AWS/Azure e uso comercial exigem contrato com a Jina. Esse é o motivo do descarte.",
+   "custo": "Licença comercial sob consulta [INFERÊNCIA].",
+   "lgpd": "Local, se licenciado.",
+   "compat_pgvector_supabase": "vector(1024).",
+   "fontes": [
+    "https://huggingface.co/jinaai/jina-embeddings-v3"
+   ]
+  },
+  {
+   "nome": "nomic-ai/nomic-embed-text-v2-moe (local)",
+   "descricao": "Mixture of Experts: 475M de parâmetros no total, 305M ativos, 8 especialistas com roteamento top-2. trust_remote_code; para ter bom desempenho em GPU pede o megablocks.",
+   "dimensao": "768, MRL até 256",
+   "limite_tokens": 512,
+   "prefixos": "'search_query: ' / 'search_document: ' obrigatórios.",
+   "qualidade_ptbr": "MMTEB pt: Belebele 93,8; WikiRet 87,3. No card: MIRACL 65,8, contra 69,2 do bge-m3 e 66,5 do mE5-large.",
+   "latencia": "[INFERÊNCIA] Porte base; o MoE pode exigir mais recursos, como o próprio card admite.",
+   "recursos": "~1 GB em FP16 (pesos completos).",
+   "licenca": "Apache-2.0 (pesos, código e dados abertos)",
+   "custo": "US$ 0",
+   "lgpd": "Local.",
+   "compat_pgvector_supabase": "vector(768).",
+   "fontes": [
+    "https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe"
+   ]
+  },
+  {
+   "nome": "google/embeddinggemma-300m (local)",
+   "descricao": "Baseado no Gemma 3, 303M de parâmetros. Repositório gated no HF, com aceite manual.",
+   "dimensao": "768, MRL para 512/256/128",
+   "limite_tokens": 2048,
+   "prefixos": "Query: 'task: search result | query: '. Documento: 'title: {título|none} | text: '.",
+   "qualidade_ptbr": "MMTEB pt: Belebele 95,2; WikiRet 90,8. Média MMTEB v2 (task) 61,15 com 768 dimensões e 59,68 com 256.",
+   "latencia": "[INFERÊNCIA] Rápido (~300M).",
+   "recursos": "~0,6 GB [INFERÊNCIA]. Não confirmei se aceita FP16; a documentação da família Gemma 3 sugere usar BF16/FP32 [INFERÊNCIA].",
+   "licenca": "Gemma Terms of Use: licença própria, não OSI, com política de uso proibido [INFERÊNCIA: permite uso comercial; o texto dos termos não foi lido].",
+   "custo": "US$ 0",
+   "lgpd": "Local.",
+   "compat_pgvector_supabase": "vector(768).",
+   "fontes": [
+    "https://ai.google.dev/gemma/docs/embeddinggemma/model_card",
+    "https://huggingface.co/google/embeddinggemma-300m"
+   ]
+  },
+  {
+   "nome": "PORTULAN/serafim-335m / 900m -portuguese-pt-sentence-encoder-ir (local, português) — DESCARTADO",
+   "descricao": "Encoders treinados em português (Universidade de Lisboa): o 335m é BERT com 1024 dimensões; o 900m é DeBERTa-v2 com 1536 dimensões. Mean pooling.",
+   "dimensao": "335m: 1024; 900m: 1536",
+   "limite_tokens": "128 (max_seq_length no Sentence Transformers). Trunca os chunks de ~300 tokens da P3.",
+   "prefixos": "Nenhum.",
+   "qualidade_ptbr": "MTEB-PT: serafim-900m tem STS 86,7, mas retrieval só 54,9 e reranking 81,0. O artigo conclui que STS forte não se traduz em retrieval. Não há resultados deles no repositório oficial do MMTEB.",
+   "latencia": "[INFERÊNCIA] Rápido, mas inútil com chunks longos.",
+   "recursos": "335m ~0,7 GB, 900m ~1,8 GB em FP16.",
+   "licenca": "MIT",
+   "custo": "US$ 0",
+   "lgpd": "Local.",
+   "compat_pgvector_supabase": "vector(1024) ou vector(1536).",
+   "fontes": [
+    "https://huggingface.co/PORTULAN/serafim-900m-portuguese-pt-sentence-encoder-ir",
+    "https://huggingface.co/PORTULAN/serafim-335m-portuguese-pt-sentence-encoder-ir",
+    "https://arxiv.org/abs/2407.19527",
+    "https://arxiv.org/abs/2607.04071"
+   ]
+  },
+  {
+   "nome": "voyageai/voyage-4-nano (local, pesos abertos da família Voyage 4)",
+   "descricao": "346M de parâmetros (180M sem embeddings + 160M de embeddings), arquitetura Qwen3, trust_remote_code. Segundo o card, compartilha o espaço vetorial com voyage-4-large/voyage-4/voyage-4-lite da API.",
+   "dimensao": "2048/1024/512/256 (MRL)",
+   "limite_tokens": 32000,
+   "prefixos": "Query: 'Represent the query for retrieving supporting documents: '. Documento: 'Represent the document for retrieval: '.",
+   "qualidade_ptbr": "Sem dado verificado para português [INFERÊNCIA]. Não está nos resultados MTEB consultados.",
+   "latencia": "[INFERÊNCIA] Porte pequeno.",
+   "recursos": "~0,7 GB em BF16.",
+   "licenca": "Apache-2.0",
+   "custo": "US$ 0",
+   "lgpd": "Local. Abre um híbrido: acervo indexado pela API e consultas dos alunos embedadas localmente no mesmo espaço vetorial, sem o texto do aluno sair da máquina [a compatibilidade entre os modelos é afirmação do fornecedor, não verificada].",
+   "compat_pgvector_supabase": "vector(1024).",
+   "fontes": [
+    "https://huggingface.co/voyageai/voyage-4-nano",
+    "https://docs.voyageai.com/docs/embeddings"
+   ]
+  },
+  {
+   "nome": "OpenAI text-embedding-3-small (API)",
+   "descricao": "API /v1/embeddings.",
+   "dimensao": "1536 por padrão; o parâmetro dimensions reduz (MRL).",
+   "limite_tokens": 8192,
+   "prefixos": "Nenhum.",
+   "qualidade_ptbr": "MMTEB pt: Belebele 93,0; XPQA 52,2; Mintaka 43,9. Não foi avaliado no MTEB-PT.",
+   "latencia": "[INFERÊNCIA] Ida e volta de rede, ~100–300 ms do Brasil.",
+   "recursos": "Nenhum localmente.",
+   "licenca": "Serviço proprietário (OpenAI Services Agreement)",
+   "custo": "US$ 0,02 por 1M tokens",
+   "lgpd": "A API não usa os dados para treino desde 01/03/2023, salvo opt-in. /v1/embeddings guarda logs de abuse monitoring por 30 dias. Zero Data Retention depende de aprovação. O Services Agreement §3.3(c) proíbe permitir uso por menores sem consentimento dos pais ou responsáveis, o que vai na mesma direção do art. 14 da LGPD. Envia a consulta do aluno, que pode ter texto de menor, a um terceiro fora do Brasil: decisão do humano.",
+   "compat_pgvector_supabase": "vector(1536), dentro do limite de 2000.",
+   "fontes": [
+    "https://developers.openai.com/api/docs/guides/embeddings",
+    "https://developers.openai.com/api/docs/pricing.md",
+    "https://developers.openai.com/api/docs/guides/your-data.md",
+    "https://openai.com/policies/services-agreement/"
+   ]
+  },
+  {
+   "nome": "OpenAI text-embedding-3-large (API)",
+   "descricao": "API /v1/embeddings.",
+   "dimensao": "3072 por padrão; dimensions reduz (MRL). A própria documentação cita o exemplo de reduzir para 1024.",
+   "limite_tokens": 8192,
+   "prefixos": "Nenhum.",
+   "qualidade_ptbr": "MTEB-PT: retrieval 91,1, o maior do benchmark, mas os autores dizem que a nota é aproximada: só 20% do WebFAQ foi avaliado e há indício de contaminação. Reranking 82,0, com queda de 6 posições. MMTEB pt: Belebele 94,7; WikiRet 91,5; XPQA 54,3; Mintaka 60,0. Média MMTEB (task) 58,93.",
+   "latencia": "[INFERÊNCIA] ~100–300 ms por consulta.",
+   "recursos": "Nenhum localmente.",
+   "licenca": "Serviço proprietário",
+   "custo": "US$ 0,13 por 1M tokens",
+   "lgpd": "Mesmas condições do 3-small.",
+   "compat_pgvector_supabase": "Com 3072 dimensões só há HNSW em halfvec (limite de 4000). Com dimensions=1024 ou 1536 cabe em vector.",
+   "fontes": [
+    "https://developers.openai.com/api/docs/guides/embeddings",
+    "https://developers.openai.com/api/docs/pricing.md",
+    "https://developers.openai.com/api/docs/guides/your-data.md",
+    "https://arxiv.org/abs/2607.04071"
+   ]
+  },
+  {
+   "nome": "Cohere embed-v4.0 / embed-multilingual-v3.0 (API)",
+   "descricao": "embed-v4.0 é multimodal e aceita texto, imagem e PDF. embed-multilingual-v3.0 é a geração anterior.",
+   "dimensao": "v4: 256/512/1024/1536 (padrão 1536, via output_dimension). multilingual-v3: 1024.",
+   "limite_tokens": "v4: 128k; multilingual-v3: 512",
+   "prefixos": "input_type obrigatório: search_document / search_query.",
+   "qualidade_ptbr": "MTEB-PT embed-v4: retrieval 90,6 (mesma ressalva dos 20% do WebFAQ), reranking 86,9, o melhor do benchmark. MMTEB pt multilingual-v3: Belebele 95,3; WikiRet 88,6; XPQA 48,5; Mintaka 36,2; média MMTEB 61,12.",
+   "latencia": "[INFERÊNCIA] ~100–300 ms.",
+   "recursos": "Nenhum localmente.",
+   "licenca": "Serviço proprietário",
+   "custo": "embed-v4: US$ 0,12 por 1M tokens de texto (US$ 0,47 por 1M em imagem), conforme a página de preços. multilingual-v3: preço atual não verificado [INFERÊNCIA ~US$ 0,10 por 1M].",
+   "lgpd": "Logs apagados após 30 dias, salvo exceções. O opt-out de uso em treino é um toggle no painel. Zero Data Retention só para enterprise. Envio a terceiro: decisão do humano.",
+   "compat_pgvector_supabase": "vector(1024) ou vector(1536).",
+   "fontes": [
+    "https://docs.cohere.com/docs/cohere-embed",
+    "https://docs.cohere.com/reference/embed",
+    "https://cohere.com/pricing",
+    "https://cohere.com/data-usage-policy",
+    "https://arxiv.org/abs/2607.04071"
+   ]
+  },
+  {
+   "nome": "Voyage voyage-4 / voyage-4-large / voyage-4-lite (API)",
+   "descricao": "Família Voyage 4 (MongoDB). Espaço vetorial compartilhado com o voyage-4-nano local.",
+   "dimensao": "1024 (padrão), 256, 512, 2048",
+   "limite_tokens": 32000,
+   "prefixos": "input_type query/document; a API antepõe prompts fixos.",
+   "qualidade_ptbr": "Sem dado verificado para português [INFERÊNCIA]. O voyage-multilingual-2 virou legado.",
+   "latencia": "[INFERÊNCIA] ~100–300 ms.",
+   "recursos": "Nenhum localmente.",
+   "licenca": "Serviço proprietário",
+   "custo": "Por 1M tokens: voyage-4-large US$ 0,12; voyage-4 US$ 0,06; voyage-4-lite US$ 0,02. Os primeiros 200M tokens são grátis por conta. voyage-multilingual-2 custa US$ 0,12, com 50M grátis.",
+   "lgpd": "Atenção: por padrão a conta vem com opt-in, e a Voyage pode guardar os dados e usá-los em treino. O opt-out exige cartão cadastrado e admin, e dá 'retenção de zero dia'. Com o nano local fazendo o embedding das consultas, só o acervo do admin iria à API.",
+   "compat_pgvector_supabase": "vector(1024). Com 2048 dimensões só há HNSW em halfvec.",
+   "fontes": [
+    "https://docs.voyageai.com/docs/embeddings",
+    "https://docs.voyageai.com/docs/pricing",
+    "https://docs.voyageai.com/docs/faq"
+   ]
+  },
+  {
+   "nome": "Google gemini-embedding-001 / gemini-embedding-2 (Gemini API) — BLOQUEADO por termos",
+   "descricao": "001 só aceita texto; 2 é multimodal. Os espaços vetoriais dos dois são incompatíveis.",
+   "dimensao": "3072 por padrão, de 128 a 3072 (MRL). Recomendados: 768, 1536 e 3072.",
+   "limite_tokens": "001: 2.048; 2: 8.192",
+   "prefixos": "001 usa task_type RETRIEVAL_QUERY/RETRIEVAL_DOCUMENT. O 2 não aceita task_type; a tarefa vai como instrução no próprio texto.",
+   "qualidade_ptbr": "001 tem os maiores números em português que vi: Belebele 96,7 e WikiRet 94,2 no MMTEB pt; média MMTEB 68,37. MTEB do 001 por dimensão: 68,16 com 2048, 68,17 com 1536, 67,99 com 768.",
+   "latencia": "[INFERÊNCIA] ~100–300 ms.",
+   "recursos": "Nenhum localmente.",
+   "licenca": "Serviço proprietário (Gemini API Additional Terms)",
+   "custo": "gemini-embedding-2: US$ 0,20 por 1M tokens de texto (US$ 0,10 em batch). 001 não aparece na página de preços atual; o File Search cobra embeddings a US$ 0,15 por 1M [INFERÊNCIA de que seja o preço do 001].",
+   "lgpd": "BLOQUEANTE. Os termos exigem usuário com 18 anos ou mais e proíbem 'API Clients' 'directed towards or likely to be accessed by individuals under the age of 18'. O Memorix inclui menores. No tier gratuito, os dados são usados para melhorar produtos e podem ser lidos por revisores humanos. A Vertex AI tem termos próprios, não verificados [INFERÊNCIA].",
+   "compat_pgvector_supabase": "Com 3072 dimensões só há HNSW em halfvec; 1536 ou 768 cabem em vector.",
+   "fontes": [
+    "https://ai.google.dev/gemini-api/docs/embeddings",
+    "https://ai.google.dev/gemini-api/docs/pricing",
+    "https://ai.google.dev/gemini-api/terms"
+   ]
+  }
+ ],
+ "tabela_dimensao_x_hnsw": "Em vector(≤2000), com HNSW direto: bge-m3 1024; e5-large, e5-large-instruct e arctic-l 1024; Qwen3-0.6B 1024 (MRL); e5-base, gte-base, nomic-v2 e embeddinggemma 768; Serafim-900m 1536; OpenAI-3-small 1536; Cohere v4 ≤1536; Voyage 4 1024. Acima de 2000, só halfvec (≤4000) ou redução MRL: OpenAI-3-large 3072, Gemini 3072, Voyage 2048. Nenhum candidato passa de 4000. Fonte: https://github.com/pgvector/pgvector.",
+ "recomendacao": {
+  "baseline_local": "BAAI/bge-m3, só o vetor denso: 1024 dimensões, normalizado, distância cosseno, max_length 512 (a P3 limita o chunk a 400 tokens do mesmo tokenizer), FP16 na GPU, sem prefixo. Motivos: (1) licença MIT; (2) contexto de 8192, sem risco de truncar; (3) em português está entre os melhores abertos nos subconjuntos MMTEB e, no MKQA pt, o denso empata com o OpenAI-3 (76,3 contra 77,5 de R@100); (4) a mesma passada entrega o esparso, que a P1 pode testar sem outro modelo; (5) o tokenizer XLM-R é o que a P3 já adotou para contar tokens; (6) ~1,1 GB em FP16, cabe na 4050 junto com o bge-reranker-v2-m3 da P4. Fraqueza conhecida: não está no MTEB-PT e sua média de retrieval no MMTEB (54,6) fica abaixo da do Qwen3-0.6B (64,6). Por isso o Qwen3 é o desafiante principal.",
+  "desafiante_local": "Qwen/Qwen3-Embedding-0.6B em 1024 dimensões, com instrução em inglês na query ('Given a student question in Portuguese, retrieve passages from course material that answer it') e documento sem instrução. É o melhor retrieval aberto no MTEB-PT (78,9) e no MMTEB. Usa a mesma coluna vector(1024), então comparar não custa migração. Custos: indexação ~1,5x mais lenta, pooling pelo último token com padding à esquerda, e um tokenizer diferente do usado pela P3 para contar tokens (400 tokens XLM-R ficam bem abaixo do limite de 32k, sem risco).",
+  "desafiante_api": "OpenAI text-embedding-3-large com dimensions=1024. Só entra se o humano autorizar o envio do acervo e das consultas. Motivos: nota mais alta de retrieval no MTEB-PT, embora aproximada e com suspeita de contaminação; sem treino com dados da API por padrão; ZDR disponível mediante aprovação; US$ 0,13 por 1M, ~US$ 0,40 por indexação completa. Alternativa mais barata: 3-small (US$ 0,02). Alternativa que protege o aluno: voyage-4-large para o acervo e voyage-4-nano local para as consultas. Nessa variante o texto do aluno não sai da máquina, mas falta evidência em português e a conta precisa do opt-out de treino.",
+  "alternativa_local_equivalente_a_api": "Qwen3-Embedding-0.6B (ou o próprio bge-m3). Se a 007 mostrar que a API supera o local, o caminho local de melhor qualidade continua sendo o Qwen3-0.6B. O voyage-4-nano só vale se a variante Voyage for escolhida.",
+  "descartados": "Gemini API: os termos proíbem apps acessíveis a menores de 18 anos. jina-v3: CC BY-NC. Serafim: 128 tokens e retrieval 54,9 no MTEB-PT. e5-large e e5-large-instruct ficam fora da primeira rodada: o limite de 512 cabe no chunk, mas o cosseno comprimido entre 0,7 e 1,0 atrapalha o gate da P5, e no MTEB-PT o retrieval deles fica abaixo do Qwen3 e do gte. Podem voltar se o Qwen3 decepcionar.",
+  "decisao_humana": "(1) Qualquer opção de API envia a consulta do aluno a terceiro fora do Brasil, porque não dá para embedar a consulta localmente no espaço vetorial de outro modelo; a única exceção é o par voyage-4 + nano. (2) O Gemini está vetado pelos termos. (3) Usar a OpenAI exige consentimento parental (§3.3(c)), o que se alinha ao art. 14 da LGPD, e a validação da assessoria jurídica."
+ },
+ "impacto_schema_0002": {
+  "coluna_baseline": "embedding vector(1024) NOT NULL, com cosseno (operador <=>, índice opcional vector_cosine_ops).",
+  "onde": "Sugestão: tabela separada chunk_embeddings(chunk_id text REFERENCES chunks(chunk_id), index_version text NOT NULL, embedding vector(1024) NOT NULL, PRIMARY KEY (chunk_id, index_version)). index_version = modelo + revisão + parâmetros de chunking, conforme rag-rastreabilidade.md. Assim a 007 compara bge-m3 e Qwen3 (ambos com 1024 dimensões) sem nova migração, e reindexar não apaga o índice anterior. Alternativa mais simples: uma coluna em chunks mais embedding_model e index_version em uma tabela de índice. Isso fica com a consolidação.",
+  "indice": "Com ~10 mil trechos, a busca exata sem índice basta (P6). Se precisar de HNSW: CREATE INDEX ... USING hnsw (embedding vector_cosine_ops) WHERE index_version = '...', um índice parcial por versão. Com 1024 dimensões não é preciso halfvec: 4.104 contra 2.056 bytes por vetor, ~41 MB contra ~21 MB em 10 mil linhas, diferença irrelevante.",
+  "esparso_opcional_P1": "Se a P1 adotar o esparso do bge-m3: sparse sparsevec(250002) [INFERÊNCIA: 250002 é o tamanho do vocabulário XLM-R, não conferido no config]. HNSW exige ≤1000 não-zeros, garantido pelo chunk ≤512 tokens.",
+  "desafiantes": "Qwen3 (1024) e OpenAI-3-large com dimensions=1024 usam o mesmo tipo vector(1024). Se usar 3072 dimensões: halfvec(3072).",
+  "migracao_0001": "Não muda. chunk_id text continua como chave e o vetor fica em tabela ou coluna nova na 0002."
+ },
+ "hipoteses_para_007": [
+  "H1: trocar o bge-m3 denso pelo Qwen3-Embedding-0.6B (1024, instrução em inglês) melhora o recall@5 em ≥2 casos a cada 20 (≥10 pp) sem piorar o MRR@10 nem aumentar o p95 da consulta em mais de 30 ms.",
+  "H2: no Qwen3, a instrução em inglês supera a instrução em português e a ausência de instrução em ≥1 caso a cada 20 no recall@5, sem mudar a latência.",
+  "H3: o OpenAI text-embedding-3-large com dimensions=1024 melhora o recall@5 em ≥10 pp sobre o bge-m3 (só medir com autorização do humano); abaixo disso, a API não compensa o custo de LGPD.",
+  "H4: reduzir o Qwen3 de 1024 para 512 dimensões (MRL) não derruba o recall@5 em mais de 1 caso a cada 20 e reduz o armazenamento pela metade.",
+  "H5: guardar o bge-m3 em halfvec(1024) em vez de vector(1024) dá o mesmo top-5 em ≥95% das consultas, com diferença de recall@5 de 0 casos.",
+  "H6 (gate/P5): a separação entre os scores de consultas dentro e fora do acervo, medida por AUROC do cosseno do top-1, é maior no bge-m3 ou no Qwen3 do que no e5 (cosseno comprimido entre 0,7 e 1,0); a meta é AUROC ≥0,8 sem reranker.",
+  "H7 (opcional, Voyage): acervo com voyage-4-large e consultas com voyage-4-nano local perde ≤1 caso a cada 20 no recall@5 contra voyage-4-large dos dois lados.",
+  "Critério numérico geral: com ~20 casos, 1 caso vale 5 pp. Só adotar um desafiante com ganho de ≥2 casos no recall@5 e sem regressão no MRR@10 nem no comportamento fora do acervo; com ≥50 casos, exigir ≥5 pp."
+ ],
+ "dependencias_com_outras_perguntas": {
+  "P1": "O esparso sai de graça só no bge-m3 (o gte também tem, mas não é recomendado). Se o baseline trocar para Qwen3 ou uma API, o lexical tem que ser o FTS portuguese do Postgres.",
+  "P3": "Chunk ≤400 tokens no tokenizer XLM-R cabe em todos os candidatos, exceto o Serafim (128). O e5 e o nomic têm teto de 512. O EmbeddingGemma tem 2048.",
+  "P4": "bge-reranker-v2-m3 (568M, ~1,1 GB em FP16) mais bge-m3 (~1,1 GB) somam ~2,5–3 GB de VRAM com ativações [INFERÊNCIA]: cabe em 6 GiB. O Qwen3-Reranker-0.6B formaria par com o Qwen3-Embedding.",
+  "P5": "A distribuição do cosseno depende do modelo (e5 fica entre 0,7 e 1,0). Um limiar calibrado vale só para um index_version e precisa ser recalibrado a cada troca de modelo.",
+  "P6": "vector(1024) está dentro dos 2000 do HNSW. Só 3072 (OpenAI-large, Gemini) ou 2048 (Voyage) exigiriam halfvec. pgvector 0.8.2 no Supabase e pgvector-python 0.5.0 no venv suportam VECTOR, HALFVEC e SPARSEVEC."
+ },
+ "inferencias": [
+  "Throughput e latências locais estimados pela conta de FLOPs, não medidos.",
+  "VRAM das ativações estimada; a dos pesos é parâmetros × 2 bytes.",
+  "A instrução do e5-large-instruct só na query (documento sem prefixo) foi deduzida do exemplo do card.",
+  "gte-multilingual-base sem prefixo: não há convenção documentada.",
+  "EmbeddingGemma: não verifiquei se aceita FP16 nem se a licença Gemma permite uso comercial (card gated, termos não lidos).",
+  "Preço atual do Cohere embed-multilingual-v3.0 e do gemini-embedding-001 não confirmados.",
+  "Qualidade em português da família Voyage 4 e compatibilidade real nano ↔ API (afirmação do fornecedor).",
+  "Termos da Vertex AI (diferentes da Gemini API) não verificados.",
+  "Dimensão do sparsevec (tamanho do vocabulário XLM-R = 250002) não conferida no config.",
+  "Licença comercial da Jina sob consulta.",
+  "As notas de API no MTEB-PT são aproximadas (20% do WebFAQ) e podem estar contaminadas, segundo os próprios autores.",
+  "No MTEB-PT não fica claro se o 'serafim-900m' avaliado é a variante -ir."
+ ],
+ "divergencias_registradas": "Nenhuma com os pares. O P3 fechou o chunk em ≤400 tokens no tokenizer do bge-m3, compatível com esta recomendação. O P5 concorda que o cosseno bruto não é um limiar portável.",
+ "revisao_pedagogica": "Não se aplica: a escolha de embedding não gera conteúdo estudado pelo aluno.",
+ "fontes": [
+  "https://huggingface.co/BAAI/bge-m3",
+  "https://arxiv.org/abs/2402.03216",
+  "https://huggingface.co/intfloat/multilingual-e5-large",
+  "https://huggingface.co/intfloat/multilingual-e5-large-instruct",
+  "https://huggingface.co/intfloat/multilingual-e5-base",
+  "https://huggingface.co/Alibaba-NLP/gte-multilingual-base",
+  "https://arxiv.org/abs/2407.19669",
+  "https://huggingface.co/Qwen/Qwen3-Embedding-0.6B",
+  "https://huggingface.co/Qwen/Qwen3-0.6B",
+  "https://huggingface.co/jinaai/jina-embeddings-v3",
+  "https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe",
+  "https://ai.google.dev/gemma/docs/embeddinggemma/model_card",
+  "https://huggingface.co/Snowflake/snowflake-arctic-embed-l-v2.0",
+  "https://huggingface.co/PORTULAN/serafim-900m-portuguese-pt-sentence-encoder-ir",
+  "https://huggingface.co/PORTULAN/serafim-335m-portuguese-pt-sentence-encoder-ir",
+  "https://arxiv.org/abs/2407.19527",
+  "https://huggingface.co/voyageai/voyage-4-nano",
+  "https://arxiv.org/abs/2607.04071",
+  "https://github.com/embeddings-benchmark/results",
+  "https://github.com/embeddings-benchmark/mteb/blob/main/mteb/benchmarks/benchmarks/benchmarks.py",
+  "https://developers.openai.com/api/docs/guides/embeddings",
+  "https://developers.openai.com/api/docs/pricing.md",
+  "https://developers.openai.com/api/docs/guides/your-data.md",
+  "https://openai.com/policies/services-agreement/",
+  "https://docs.cohere.com/docs/cohere-embed",
+  "https://docs.cohere.com/reference/embed",
+  "https://cohere.com/pricing",
+  "https://cohere.com/data-usage-policy",
+  "https://docs.voyageai.com/docs/embeddings",
+  "https://docs.voyageai.com/docs/pricing",
+  "https://docs.voyageai.com/docs/faq",
+  "https://ai.google.dev/gemini-api/docs/embeddings",
+  "https://ai.google.dev/gemini-api/docs/pricing",
+  "https://ai.google.dev/gemini-api/terms",
+  "https://github.com/pgvector/pgvector",
+  "https://www.nvidia.com/en-us/geforce/laptops/40-series/"
+ ]
+}

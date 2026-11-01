@@ -1,0 +1,432 @@
+{
+ "pergunta": "P5 — valores de k (k_cand = candidatos recuperados e pontuados; k_ger = trechos entregues à geração) e sinal de score do gate de suficiência (\"não está no acervo\"). É bloqueante porque tema ausente não pode gerar conteúdo para menor. Implementar o gate não é objetivo desta tarefa.",
+ "opcoes": [
+  {
+   "grupo": "sinal_do_gate",
+   "nome": "S1 — Limiar absoluto do cosseno denso (top-1)",
+   "descricao": "s1 = 1 − (embedding <=> q) do primeiro candidato. Recusa se s1 < τ_cos.",
+   "qualidade_ptbr": "Fraco e sem portabilidade entre modelos. Por que é instável: (a) os modelos são treinados com InfoNCE a temperatura 0,01, o que comprime os escores numa faixa estreita. O card do e5 diz que o cosseno fica entre 0,7 e 1,0. O card do BGE diz que fica em [0,6; 1] e que 'what matters is the relative order of the scores, not the absolute value', recomendando escolher o limiar pela distribuição dos seus próprios dados. O próprio BGE mudou essa distribuição da v1 para a v1.5. (b) Anisotropia: as representações contextuais não são isotrópicas (Ethayarajh 2019), então a similaridade de base depende do modelo e do pooling. (c) O nível do top-1 depende do comprimento e da especificidade da consulta e dos prefixos ('query: '/'passage: '). (d) Um tema vizinho ausente (ex.: meiose num acervo que só tem mitose) tende a ter cosseno tão alto quanto um acerto, porque o embedding captura tema, não suficiência [INFERÊNCIA]. Consequência: τ_cos só vale para aquele embedding_model + prefixo + chunking e precisa ser recalibrado a cada troca.",
+   "latencia": "~0 ms adicionais (o escore já vem da busca)",
+   "recursos": "nenhum além do modelo de embedding (P2)",
+   "licenca": "n/a (é a do modelo de P2)",
+   "custo": "local: 0. Com embedding via API, o custo é o de P2.",
+   "lgpd": "Local: nada sai. Com embedding via API, a consulta do aluno sai para terceiro (decisão do humano, ver P2).",
+   "compat_pgvector_supabase": "Nativo: 1 - (embedding <=> :q). O operador <=> do pgvector é distância cosseno.",
+   "fontes": [
+    "https://huggingface.co/intfloat/multilingual-e5-large",
+    "https://huggingface.co/BAAI/bge-large-en-v1.5",
+    "https://arxiv.org/abs/1909.00512",
+    "https://github.com/pgvector/pgvector"
+   ]
+  },
+  {
+   "grupo": "sinal_do_gate",
+   "nome": "S2 — Margem top1 − topN (estilo QPP)",
+   "descricao": "s1 − s5 (ou s1 − média do top-k), sobre o cosseno ou sobre o escore do reranker.",
+   "qualidade_ptbr": "Não combina com o produto. Tema bem coberto em material didático tem muitos trechos relevantes: a distribuição fica alta e plana, a margem fica pequena e o gate recusaria sem motivo. Consulta fora do acervo com um único trecho vagamente parecido dá margem grande [INFERÊNCIA]. Na literatura, preditores de desempenho de consulta (QPP) são significativamente piores em IR neural, com queda de até 10% em passage retrieval (Faggioli et al. 2023). Uso proposto: só registrar no rastro.",
+   "latencia": "~0 ms",
+   "recursos": "nenhum",
+   "licenca": "n/a",
+   "custo": "0",
+   "lgpd": "local",
+   "compat_pgvector_supabase": "Calculado em Python sobre os escores devolvidos pela query",
+   "fontes": [
+    "https://arxiv.org/abs/2302.09947"
+   ]
+  },
+  {
+   "grupo": "sinal_do_gate",
+   "nome": "S3 — Escore do cross-encoder (reranker) — RECOMENDADO",
+   "descricao": "O reranker da P4 pontua cada par (tema, trecho) em conjunto. O sinal é o logit bruto; o sigmoid dá [0,1] e é equivalente para limiar, porque é monotônico. Recusa se max logit < τ_rr. É o mesmo desenho do avaliador do CRAG: escore por par, 'Correct' se ao menos um documento passa do limiar superior, 'Incorrect' se todos ficam abaixo do inferior.",
+   "qualidade_ptbr": "É o sinal que mais separa relevante de irrelevante por par [INFERÊNCIA; apoiado no CRAG, onde um avaliador pequeno fine-tuned (T5-large, 0,77B) acertou 84,3% da relevância contra 58,0% do ChatGPT via prompt]. Não vem calibrado: sigmoid não é probabilidade (Guo et al. 2017), e a Cohere avisa que 'the score is query dependent' e manda calibrar o limiar com 30–50 consultas representativas e documentos limítrofes. O bge-reranker-v2-m3 é multilíngue; PT-BR não foi medido pelo fabricante. No próprio CRAG os limiares mudam por dataset: (0,59; −0,99) PopQA, (0,5; −0,91) PubHealth/ARC, (0,95; −0,91) Biography. Logo, calibrar nos nossos casos é obrigatório.",
+   "latencia": "+0,25–0,5 s para 30 pares na RTX 4050 em fp16 (estimativa da P4 por FLOPs) [INFERÊNCIA]. Custo já pago se o reranker entrar para ordenar.",
+   "recursos": "~1,1 GB de VRAM em fp16 (bge-reranker-v2-m3, ~568M parâmetros; número da P4) [INFERÊNCIA]",
+   "licenca": "Apache-2.0 (bge-reranker-v2-m3)",
+   "custo": "local: 0. API (Cohere Rerank etc.): cobrado por busca, não por token (docs da Cohere); o valor atual não foi extraído aqui (ver P4).",
+   "lgpd": "Local: nada sai. Via API: consulta do aluno + 30 trechos por busca vão ao provedor (decisão do humano).",
+   "compat_pgvector_supabase": "Roda fora do banco (Python) sobre chunk_id + text devolvidos pelo pgvector. Sem impacto em schema.",
+   "fontes": [
+    "https://huggingface.co/BAAI/bge-reranker-v2-m3",
+    "https://sbert.net/docs/package_reference/cross_encoder/model.html",
+    "https://docs.cohere.com/docs/reranking-best-practices",
+    "https://docs.cohere.com/docs/how-does-cohere-pricing-work",
+    "https://arxiv.org/abs/2401.15884",
+    "https://arxiv.org/abs/1706.04599"
+   ]
+  },
+  {
+   "grupo": "sinal_do_gate",
+   "nome": "S4 — Número de trechos acima do limiar (n_sup)",
+   "descricao": "n_sup = #{candidatos com escore ≥ τ}, combinável com S1 ou S3. O gate exige n_sup ≥ m (m = 1 no MVP). n_sup também limita os trechos entregues e informa o teto de itens gerados.",
+   "qualidade_ptbr": "Protege contra um único trecho espúrio e liga suficiência à quantidade pedida: gerar 10 questões a partir de 1 trecho é risco de repetição ou invenção [INFERÊNCIA]. m = 2 é hipótese para a 007 (H5.2).",
+   "latencia": "~0 ms",
+   "recursos": "nenhum",
+   "licenca": "n/a",
+   "custo": "0",
+   "lgpd": "local",
+   "compat_pgvector_supabase": "Python sobre os escores. Sem schema.",
+   "fontes": [
+    "https://arxiv.org/abs/2401.15884"
+   ]
+  },
+  {
+   "grupo": "sinal_do_gate",
+   "nome": "S5 — Verificação por LLM de 'contexto suficiente' (autorater)",
+   "descricao": "Prompt com o tema + os k_ger trechos → JSON {suficiente: bool, chunk_ids_de_suporte: [...]}, validado por schema. Candidato a segunda camada, só na faixa cinza.",
+   "qualidade_ptbr": "Não medida em PT-BR. No Sufficient Context (ICLR 2025, conjunto difícil de 115 instâncias em inglês): Gemini 1.5 Pro 1-shot teve 93% de acurácia, FLAMe 24B 87,8%, TRUE-NLI 82,6% (que exige a resposta-ouro). Não dá para confiar na recusa do próprio gerador: no RGB a maior taxa de rejeição com só documentos-ruído foi 45% (EN) e 43,33% (ZH). No Sufficient Context, com RAG os modelos se abstêm menos (Claude 3.5: 84,1% → 52%) e alucinam mais do que se abstêm. Um LLM via prompt também avaliou relevância pior que um avaliador fine-tuned (CRAG). Pode ser induzido por texto dentro dos trechos (prompt injection).",
+   "latencia": "+0,5–2 s via API; 1–3 s com LLM local de 3–7B quantizado na 4050, disputando VRAM [INFERÊNCIA]",
+   "recursos": "API: nenhum local. Local: ~3–5 GB de VRAM para 7B em 4 bits [INFERÊNCIA], inviável junto com embedding + reranker em 6 GB [INFERÊNCIA].",
+   "licenca": "depende do modelo",
+   "custo": "Exemplo Gemini 3.5 Flash-Lite, tier pago: US$ 0,30 / 1M de entrada e US$ 2,50 / 1M de saída. Com ~2,7k tokens de entrada (8 trechos × 300 + prompt) e ~50 de saída ≈ US$ 0,00094 por consulta ≈ US$ 0,94 por 1.000 consultas (contagem de tokens estimada) [INFERÊNCIA].",
+   "lgpd": "A consulta do menor + os trechos saem para terceiro. No tier gratuito do Gemini o conteúdo é 'used to improve our products' (inaceitável para dado de menor); no pago, não. Decisão do humano. Se a geração já usar o mesmo provedor, o destinatário não muda, mas há uma transferência a mais.",
+   "compat_pgvector_supabase": "Fora do banco. Sem schema.",
+   "fontes": [
+    "https://arxiv.org/abs/2411.06037",
+    "https://arxiv.org/abs/2309.01431",
+    "https://arxiv.org/abs/2401.15884",
+    "https://ai.google.dev/gemini-api/docs/pricing"
+   ]
+  },
+  {
+   "grupo": "sinal_do_gate",
+   "nome": "S6 — Verificação NLI local (mDeBERTa, já adotado no pedagogical_understand)",
+   "descricao": "Premissa = trecho; hipótese = 'Este texto explica {tema}.' Passa se entailment ≥ τ_nli em ao menos um trecho aprovado por S3. Segunda camada local, só na faixa cinza.",
+   "qualidade_ptbr": "Licença MIT, português no treino. O próprio card avisa que o dataset multilíngue foi feito por tradução automática, o que reduz a qualidade para NLI. Hipótese 'trata do tema' não é o mesmo que suficiência: o Sufficient Context mostra que entailment é outra tarefa (TRUE-NLI: precisão 0,938, recall 0,726, e com resposta-ouro). Qualidade para esse uso [INFERÊNCIA]; medir antes de adotar.",
+   "latencia": "~50–150 ms para 8–30 pares em fp32 na GPU [INFERÊNCIA]",
+   "recursos": "~1 GB de VRAM em fp32 (~276M parâmetros; o card do produto veta FP16) [INFERÊNCIA]. O modelo já fica carregado para o classifier.",
+   "licenca": "MIT",
+   "custo": "0",
+   "lgpd": "local, nada sai",
+   "compat_pgvector_supabase": "Python. Sem schema.",
+   "fontes": [
+    "https://huggingface.co/MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7",
+    "https://arxiv.org/abs/2411.06037"
+   ]
+  },
+  {
+   "grupo": "sinal_do_gate",
+   "nome": "S7 — Evidência lexical do tema (FTS portuguese)",
+   "descricao": "Quantidade de candidatos com ts_rank_cd > 0 para os termos do tema, vinda da busca híbrida da P1.",
+   "qualidade_ptbr": "Forte quando o tema tem nome próprio e está ausente (zero matches). Falha com sinônimo ou paráfrase; o stemmer portuguese só cobre variação morfológica. Serve como feature auxiliar ou veto em hipótese, nunca como sinal único [INFERÊNCIA].",
+   "latencia": "~0 ms se o híbrido já estiver ativo",
+   "recursos": "a coluna tsvector da P1/P6",
+   "licenca": "PostgreSQL",
+   "custo": "0",
+   "lgpd": "local",
+   "compat_pgvector_supabase": "Nativo no Postgres (ver P1/P6)",
+   "fontes": [
+    "https://github.com/pgvector/pgvector"
+   ]
+  },
+  {
+   "grupo": "k_e_diversidade",
+   "nome": "K1 — k_cand (pool pontuado pelo reranker e visto pelo gate): 20 | 30 | 50",
+   "descricao": "Candidatos depois da fusão (P1) que o reranker pontua. O gate só enxerga esse pool.",
+   "qualidade_ptbr": "Pool maior aumenta o recall pós-rerank, com retorno decrescente. Com ~10 mil trechos (suposição), 30 deve bastar [INFERÊNCIA]. Referências: o RGB usou top-30 chunks de 300 tokens como pool; a Anthropic reranqueou 150 → 20 num acervo maior.",
+   "latencia": "O reranker escala ~linear com k_cand [INFERÊNCIA]: 20 ≈ 0,17–0,33 s; 30 ≈ 0,25–0,5 s; 50 ≈ 0,4–0,8 s (derivado da estimativa da P4)",
+   "recursos": "um batch de 30–50 pares de ~350 tokens cabe em 6 GB [INFERÊNCIA]",
+   "licenca": "n/a",
+   "custo": "API de reranker: preço por busca, sensível ao nº de documentos (ver P4)",
+   "lgpd": "igual a S3",
+   "compat_pgvector_supabase": "O HNSW devolve no máximo hnsw.ef_search resultados (40 por padrão). k_cand = 50 exige SET LOCAL hnsw.ef_search ≥ 50 na transação. Busca exata sem índice (viável com 10 mil trechos, ver P6) não tem esse limite.",
+   "fontes": [
+    "https://github.com/pgvector/pgvector",
+    "https://arxiv.org/abs/2309.01431",
+    "https://www.anthropic.com/engineering/contextual-retrieval"
+   ]
+  },
+  {
+   "grupo": "k_e_diversidade",
+   "nome": "K2 — k_ger por tipo de conteúdo",
+   "descricao": "Proposta: questões MC/V-F = 8; flashcards = 8; aula = 15. Sempre min(k_ger, n_sup): só entram trechos aprovados pelo gate. Com ~300 tokens por trecho (P3): ~2,4k tokens para questões/flashcards e ~4,5k para aula.",
+   "qualidade_ptbr": "Anthropic: entregar 20 chunks foi melhor que 10 ou 5 no benchmark deles. Sufficient Context: diferença modesta de 2k para 6k tokens e nenhuma de 6k para 10k. Lost in the Middle: informação no meio do contexto é mais mal usada, então ordenar por escore (mais relevante primeiro). Para aula, a ordem do documento pode dar mais coerência [INFERÊNCIA; hipótese de geração, não de retrieval]. Um trecho sustenta ~1–3 flashcards ou questões [INFERÊNCIA].",
+   "latencia": "Afeta só os tokens de entrada da geração (provider ainda indefinido)",
+   "recursos": "n/a",
+   "licenca": "n/a",
+   "custo": "proporcional aos tokens de entrada da geração",
+   "lgpd": "n/a (os trechos são do admin; a consulta segue o caminho da geração)",
+   "compat_pgvector_supabase": "n/a",
+   "fontes": [
+    "https://www.anthropic.com/engineering/contextual-retrieval",
+    "https://arxiv.org/abs/2411.06037",
+    "https://arxiv.org/abs/2307.03172"
+   ]
+  },
+  {
+   "grupo": "k_e_diversidade",
+   "nome": "K3 — Diversidade: dedupe por offsets × MMR",
+   "descricao": "Dedupe: funde trechos sobrepostos ou adjacentes do mesmo doc_id usando offset_start/offset_end (já na 0001), com teto opcional por documento. Remove a redundância criada pelo overlap de 10–15% da P3. MMR (Carbonell & Goldstein 1998): escolhe o próximo trecho por λ·sim(q,d) − (1−λ)·max sim(d, já escolhidos).",
+   "qualidade_ptbr": "Dedupe é determinístico e barato, e resolve a maior parte da redundância [INFERÊNCIA]. MMR pode ajudar a cobertura da aula, mas pode trocar um trecho relevante por um apenas diverso. Só com ganho medido (H5.9).",
+   "latencia": "dedupe ~0 ms; MMR < 5 ms para 30 vetores [INFERÊNCIA]",
+   "recursos": "MMR precisa dos vetores dos candidatos (SELECT da coluna de embedding)",
+   "licenca": "n/a",
+   "custo": "0",
+   "lgpd": "local",
+   "compat_pgvector_supabase": "Dedupe usa colunas da 0001. MMR usa a coluna de vetor da 0002 (P2/P6), sem coluna nova.",
+   "fontes": [
+    "https://doi.org/10.1145/290941.291025"
+   ]
+  }
+ ],
+ "recomendacao": {
+  "decisao": "O gate é determinístico e local, e usa o escore do cross-encoder (S3) junto com a contagem de trechos acima do limiar (S4).",
+  "como_funciona": [
+   "O reranker da P4 (local: bge-reranker-v2-m3) pontua os pares (tema, trecho) sobre k_cand = 30 candidatos da busca (híbrida, se a P1 aprovar).",
+   "O tema vem do pedagogical_understand, não do pedido bruto.",
+   "O rastro registra o logit bruto e o sigmoid de cada chunk_id (combinado com P4 e P1).",
+   "n_sup = #{logit ≥ τ_rr}. Se n_sup ≥ 1, a geração segue. Se não, o aluno recebe 'não está no acervo' e a geração não é chamada.",
+   "n_sup limita os trechos entregues e informa o teto de itens. A regra de quantidade é decisão pedagógica."
+  ],
+  "calibracao": {
+   "quando": "na 007",
+   "regra": "escolher o τ_rr com a menor recusa incorreta (FRR), sujeito a aceite indevido (FAR) = 0 nos casos fora (distante + vizinho), em validação cruzada leave-one-out",
+   "onde_fica": "constante no código, chaveada pelo par (embedding_model, modelo do reranker), sem coluna (index_version foi recusado pelo humano no gate 2, resposta 11)",
+   "recalibrar_quando": "a cada troca de embedding_model, chunking ou reranker"
+  },
+  "k": [
+   "k_cand = 30",
+   "k_ger = 8 para questões e flashcards",
+   "k_ger = 15 para aula",
+   "k_ger sempre limitado por n_sup",
+   "ordenação por escore",
+   "dedupe por offsets",
+   "sem MMR no MVP"
+  ],
+  "justificativa": [
+   "O cosseno (S1) não é portável: a compressão da temperatura (e5 0,7–1,0; BGE 0,6–1, 'what matters is the relative order') e a anisotropia fazem o limiar valer só para um modelo, e ele tende a falhar no tema vizinho.",
+   "A margem (S2) é desalinhada com material didático e é fraca em IR neural.",
+   "O LLM (S5) como gate primário tem custo, latência, é injetável, depende da decisão de LGPD e, via prompt, avalia relevância pior que um avaliador fine-tuned (CRAG).",
+   "O cross-encoder já pode estar no pipeline por ordenação, então o custo marginal do gate é ~0. É o mesmo desenho do avaliador do CRAG e é calibrável com o procedimento que o próprio mercado recomenda (Cohere: 30–50 consultas).",
+   "Não dá para delegar a recusa ao gerador: no RGB, rejeição ≤ 45%; no Sufficient Context, com contexto os modelos alucinam mais do que se abstêm."
+  ],
+  "faixa_cinza": [
+   "Fica fora do MVP: com uma só ação de recusa, basta um limiar.",
+   "Entra só se a 007 mostrar FAR > 0 em fora_vizinho que nenhum τ resolve sem FRR > 10%.",
+   "Nesse caso, 3 zonas como no CRAG: acima de τ_alto passa; abaixo de τ_baixo recusa; no meio, segunda verificação.",
+   "A segunda verificação testa primeiro NLI local (S6, custo 0, nada sai), depois LLM (S5, só com decisão do humano)."
+  ],
+  "alternativa_local": "A recomendação já é 100% local. Se o humano aprovar API: o escore de um reranker via API (Cohere/Voyage/Jina) segue o mesmo protocolo, com τ recalibrado; a consulta do menor e os trechos passam a sair a cada busca.",
+  "fallback_sem_reranker": "Se a P4 recomendar não ter reranker: S1 calibrado por embedding_model + S4 + S7 como veto em hipótese. É mais fraco, a medir (H5.1). O gate é o argumento mais forte para o reranker entrar mesmo com ganho pequeno de ranking.",
+  "limite": "O gate não substitui a validação pós-geração (item → chunk_id + fidelidade), que continua obrigatória como segunda barreira. Com 8 casos fora, FAR = 0 só garante FAR < 3/8 ≈ 37% com 95% de confiança (regra de três)."
+ },
+ "protocolo_medicao_007": {
+  "arquivo_de_casos": "backend/evals/retrieval/casos.jsonl (criado pela 006), um caso por linha",
+  "formato_caso": {
+   "exemplo_no_acervo": {
+    "case_id": "ret-0001",
+    "suite": "capacidade",
+    "tipo": "questionario",
+    "classe": "no_acervo",
+    "consulta": "quero 5 questoes sobre fases da mitose",
+    "tema": "fases da mitose",
+    "fora_do_acervo": false,
+    "esperado": [
+     {
+      "doc_sha256": "<64 hex>",
+      "offset_start": 1200,
+      "offset_end": 1650,
+      "ancora": "primeiros ~50 caracteres do intervalo",
+      "essencial": true
+     }
+    ],
+    "extrator": "id+versão do extrator da 004",
+    "nota": "por que esse intervalo sustenta o pedido"
+   },
+   "exemplo_fora": {
+    "case_id": "ret-0013",
+    "suite": "capacidade",
+    "tipo": "flashcard",
+    "classe": "fora_vizinho",
+    "consulta": "flashcards sobre meiose",
+    "tema": "meiose",
+    "fora_do_acervo": true,
+    "esperado": [],
+    "verificacao_ausencia": "FTS dos termos no acervo + leitura humana dos 10 primeiros candidatos, com data",
+    "nota": "acervo tem mitose, não meiose"
+   },
+   "regras": [
+    "Classes: no_acervo, fora_distante (tema sem relação com o acervo) e fora_vizinho (tema próximo mas ausente, onde o gate falha). 'parcial' fica para depois da decisão pedagógica sobre o comportamento.",
+    "Os offsets são semiabertos [start, end) no texto extraído e normalizado do documento identificado por doc_sha256. Não dependem do chunking: o mesmo caso serve para qualquer tamanho de chunk da P3. A convenção precisa ser alinhada com a 004.",
+    "A 0001 não guarda o texto integral. O harness re-extrai o arquivo-fonte (conferindo o sha256) e verifica texto[offset_start:offset_end].startswith(ancora) antes de medir. Se não bater, falha rápido: o extrator mudou e o caso precisa ser reancorado.",
+    "Consultas escritas à mão no estilo do aluno, com ~25% informais ou com erro de digitação. Nunca dados reais de menores (LGPD).",
+    "O campo tema permite testar o gate isolado do pedagogical_understand."
+   ]
+  },
+  "regra_de_acerto": "Um chunk c (doc_sha256_c, [a_c, b_c)) acerta o intervalo esperado e (doc_sha256_e, [a_e, b_e)) se doc_sha256_c = doc_sha256_e e ov = max(0, min(b_c, b_e) − max(a_c, a_e)) satisfaz ov ≥ 0,5·(b_e − a_e) OU ov ≥ 0,5·(b_c − a_c). A 1ª cláusula conta chunk grande que cobre intervalo pequeno; a 2ª conta chunk pequeno dentro de intervalo longo; encostar pela sobreposição da borda não conta. O doc_sha256 do chunk vem do JOIN chunks.doc_id → documents.doc_sha256. O 50% é convenção e fica registrado no relatório.",
+  "metricas": {
+   "retrieval": {
+    "casos_usados": "só no_acervo",
+    "recall@5": "média, por caso, de |intervalos esperados acertados no top-5| / |intervalos esperados|",
+    "MRR@10": "média de 1/posição do primeiro chunk que acerta algum intervalo esperado; 0 se nenhum no top-10",
+    "recall_orcamento_1500": "mesmo recall, cortando pelo acumulado de ~1500 tokens em vez de 5 chunks (proposta da P3, para comparar tamanhos de chunk)",
+    "pontos_de_medida": "antes do rerank (saída da fusão) e depois do rerank, para isolar o efeito do reranker"
+   },
+   "gate": {
+    "classe_positiva": "recusar",
+    "taxa_recusa_correta": "fora recusados / total de fora, reportada separada para fora_distante e fora_vizinho",
+    "aceite_indevido_FAR": "fora que passaram / total de fora; métrica crítica (conteúdo sem fonte para menor)",
+    "taxa_recusa_incorreta_FRR": "no_acervo recusados / total de no_acervo",
+    "precisao_da_recusa": "fora recusados / total de recusados",
+    "AUROC_do_sinal": "separação fora × no_acervo sem depender de τ; é a métrica para comparar S1 × S3 × S3+S4 × S3+S2",
+    "curva": "varrer τ sobre todos os escores observados e tabelar (FAR, FRR) por τ. Com amostra pequena, anexar também o gráfico de pontos dos escores por caso, que é mais honesto que uma curva de 8 pontos",
+    "escolha_de_tau": "menor FRR com FAR = 0 em leave-one-out; reportar FAR e FRR fora da amostra; a partir de ≥ 60 casos, separar calibração e teste 50/50"
+   },
+   "latencia": {
+    "metrica": "p95 por etapa, a partir do duracao_ms do rastro: embedding da consulta, SQL + rede até o Supabase, rerank e gate; mais o p95 do total",
+    "execucao": "modelos já carregados, 3 chamadas de aquecimento, cada caso rodado 5× (≥ 100 amostras com 20 casos; p95 de 20 amostras é o 19º valor e é instável). Cold start reportado à parte. Hardware fixo: RTX 4050 6 GiB."
+   },
+   "extras_no_relatorio": "distribuição de n_sup por classe, tokens entregues à geração (k_ger × tamanho do trecho) e VRAM de pico"
+  },
+  "baseline_denso_so": {
+   "modelo": "modelo baseline da P2 (provável bge-m3 denso 1024; confirmar na consolidação)",
+   "chunking": "chunking provisório da P3 (~300 tokens, overlap 10–15%)",
+   "busca": "exata ou HNSW com ef_search padrão 40",
+   "k_cand": 30,
+   "reranker": "nenhum",
+   "lexical": "nenhum",
+   "gate": "cosseno top-1 ≥ τ_cos calibrado nos casos (S1), com n_sup ≥ 1 em τ_cos",
+   "k_ger": 8,
+   "diversidade": "sem MMR; dedupe só por chunk_id"
+  },
+  "ordem_das_variaveis": {
+   "regra": "Uma variável por vez; a vencedora fica fixa antes da próxima.",
+   "passos": [
+    "1. Modelo de embedding, com denso só (P2)",
+    "2. Tamanho do chunk (P3). Exige reindexar; comparar também pelo recall com orçamento",
+    "3. Híbrido: FTS + RRF, ou sparse do BGE-M3 (P1)",
+    "4. Reranker sim/não e qual modelo (P4)",
+    "5. k_cand: 20, 30 e 50",
+    "6. Sinal do gate e τ: S1 × S3 × S3+S4(m=2) × S3+S2. Sempre por último, porque a distribuição de escores depende de tudo acima; recalibrar se 1–5 mudarem",
+    "7. k_ger, dedupe e MMR: só com os evals de geração (fidelidade); pode ficar para a tarefa de geração"
+   ],
+   "observacao": "Se a consolidação trocar a ordem de 1–5, mantenha a regra: a calibração do gate é sempre a última e é refeita após qualquer mudança acima."
+  },
+  "criterio_de_decisao": {
+   "mudanca_de_retrieval": "Adotar se: (a) ganho líquido ≥ 2 casos no recall@5 (acertos novos − perdidos; ≈ +17 p.p. com 12 casos respondíveis), ou ganho = 0 com ΔMRR@10 ≥ +0,05; (b) nenhum caso da suíte de regressão perdido; (c) p95 de retrieval + rerank + gate ≤ 1,0 s em regime quente (orçamento proposto; o orquestrador ou o humano confirma). Empate: fica a opção mais simples, local e barata.",
+   "gate": "Aceitar (sinal, τ) só com: FAR = 0 em todos os fora (distante e vizinho) no leave-one-out E FRR ≤ 10% (≤ 1 dos 12 respondíveis). Entre sinais, preferir o de maior AUROC; diferença < 0,05 → o mais simples e local.",
+   "ressalva_estatistica": "Regra de três: 0 falhas em n casos → taxa real < 3/n com 95% de confiança. Com 8 fora, FAR < ~37%; para afirmar FAR < 10% são 30 fora sem falha; para < 5%, 60. Até lá, o gate não é garantia sozinho; a validação pós-geração é obrigatória."
+  },
+  "amostra": {
+   "minimo_inicial": "20 casos = 12 no_acervo (4 questionário, 4 flashcard, 4 aula) + 8 fora (4 fora_distante + 4 fora_vizinho), ou seja, 40% fora",
+   "justificativa": "'Balanceados' segundo o pipeline, com um pouco mais de peso nos respondíveis para o recall ter resolução mínima. 10/10 estrito também serve; cabe ao orquestrador.",
+   "crescimento": [
+    "Toda falha vira caso de regressão.",
+    "Meta: 30 fora sem falha (FAR < 10%) e 30 respondíveis.",
+    "Depois: 60 fora (FAR < 5%) e separação calibração/teste."
+   ],
+   "pre_requisito": "Casos fora_vizinho só podem ser escritos com o acervo real em mãos (scraping da 006), porque a ausência precisa ser verificada contra ele."
+  }
+ },
+ "impacto_schema_0002": {
+  "colunas_novas_por_P5": "Nenhuma. Escores, n_sup e decisão do gate são calculados por consulta e vão para o rastro JSONL (rag-rastreabilidade.md), não para o banco.",
+  "usa_de_outras_perguntas": [
+   "coluna de vetor + embedding_model (P2/P6, tarefa 008)",
+   "coluna tsvector se S7 ou híbrido (P1/P6)",
+   "MMR, se adotado, só lê a coluna de vetor dos candidatos"
+  ],
+  "indices_e_config": "Sem índice novo. Se k_cand > 40 com HNSW, usar SET LOCAL hnsw.ef_search ≥ k_cand na transação; é configuração de sessão, não schema.",
+  "limiares": "τ_rr, τ_cos e m ficam como constantes no código, chaveadas por (embedding_model, reranker). Sem coluna index_version (recusada pelo humano, gate 2, resposta 11).",
+  "0001": "Não muda. O protocolo usa só documents.doc_sha256, chunks.doc_id, position, offset_start e offset_end, que já existem. O dedupe por offsets também usa só colunas da 0001.",
+  "observacao": "A 0001 não guarda o texto integral. O harness da 007 precisa do arquivo-fonte, identificado pelo sha256, para validar a âncora dos casos. É requisito do harness, não do schema."
+ },
+ "hipoteses_para_007": [
+  "H5.1: trocar o sinal do gate de cosseno denso top-1 (S1) pelo logit do cross-encoder top-1 (S3) melhora o AUROC fora × no_acervo em ≥ 0,10 e zera o FAR em fora_vizinho, sem FRR > 10% e sem somar ao p95 mais que o custo do próprio reranker.",
+  "H5.2: exigir n_sup ≥ 2 em vez de ≥ 1 (questões e flashcards) reduz o FAR em fora_vizinho sem aumentar o FRR em mais de 1 caso.",
+  "H5.3: somar a margem top1 − top5 ao logit do reranker (regressão logística com 2 features) melhora o AUROC em ≥ 0,03 sem piorar o FRR. Expectativa: refutada (QPP fraco em IR neural).",
+  "H5.4: aplicar o τ_cos calibrado no modelo A ao modelo B sem recalibrar piora FAR ou FRR em ≥ 20 p.p. Teste de sanidade que justifica recalibrar a cada embedding_model.",
+  "H5.5: k_cand de 30 para 50 (com reranker) ganha ≥ 1 caso no recall@5 pós-rerank sem piorar o p95 em mais de 30%; de 30 para 20 reduz o p95 em ≥ 30% sem perder caso.",
+  "H5.6: pontuar o gate com o tema extraído pelo pedagogical_understand, em vez do pedido bruto ('crie 10 flashcards sobre …'), melhora o AUROC em ≥ 0,05 sem piorar o recall@5.",
+  "H5.7: verificar 'contexto suficiente' por LLM só na faixa cinza [τ_baixo, τ_alto) zera o FAR em fora_vizinho sem aumentar o FRR em mais de 5 p.p., acionando ≤ 20% das consultas. Só com decisão do humano sobre API.",
+  "H5.8: NLI local (mDeBERTa, hipótese 'Este texto explica {tema}.') como segunda verificação na faixa cinza alcança o mesmo FAR de H5.7 com custo 0 e nada saindo da máquina, com FRR ≤ +5 p.p. em relação a H5.7.",
+  "H5.9: deduplicar por offsets (fundindo chunks sobrepostos ou adjacentes do mesmo doc) antes de cortar em k_ger aumenta os intervalos esperados distintos entregues no top-k_ger em ≥ 1 caso sem piorar o recall@5.",
+  "H5.10 (aula): MMR com λ = 0,7 sobre os trechos aprovados pelo gate aumenta a cobertura de intervalos esperados distintos no top-15 sem piorar o recall@5. Medir só se H5.9 não bastar."
+ ],
+ "dependencias_com_outras_perguntas": [
+  "P4: o reranker escolhido é o sinal do gate. Sem reranker, o gate cai para S1 + S4, mais fraco. Combinado com P4: k_cand = 30, rastro com logit bruto + sigmoid, latência estimada de 0,25–0,5 s para 30 pares [INFERÊNCIA].",
+  "P1: o escore RRF só depende da posição (1/(60 + rank)) e não serve ao gate. Combinado com P1: a fusão devolve também o cosseno bruto e o ts_rank_cd por candidato, para o rastro, o fallback S1 e a feature S7.",
+  "P2: a distribuição do cosseno muda por modelo (e5 0,7–1,0, confirmado também pela P2), então o τ é chaveado por embedding_model. Embedding via API faz a consulta do menor sair (LGPD).",
+  "P3: o tamanho do chunk afeta o escore do reranker (o exemplo do card trunca em max_length = 512, então chunk maior é pontuado só em parte) e a facilidade de acerto na 007 (daí o recall com orçamento, proposta da P3). Teto combinado: ≤ 512 tokens. A convenção dos offsets ([start, end), texto normalizado) precisa bater com a 004.",
+  "P6: ef_search padrão 40 ≥ k_cand = 30. A busca exata é viável com ~10 mil trechos (P6) e elimina o limite do ef_search.",
+  "pedagogical_understand: fornece o tema que o gate pontua. Pedido ambíguo já pergunta ao aluno antes do retrieval.",
+  "Validação pós-geração (proposta no produto.md): é a segunda barreira; o gate não a substitui.",
+  "006: cria os casos neste formato e precisa do acervo real para os fora_vizinho."
+ ],
+ "inferencias": [
+  "Cosseno falhar mais em tema vizinho que em distante: raciocínio a partir da natureza do embedding (tema ≠ suficiência). A medir (H5.1).",
+  "Cross-encoder separar melhor que cosseno em PT-BR neste acervo: apoiado no CRAG (avaliador por par fine-tuned > LLM via prompt), não medido em PT-BR.",
+  "A perda de treino do bge-reranker-v2-m3 normal não é declarada no card; o formato de dados (query, pos[], neg[], train_group_size) sugere perda por grupo. Por isso o escore absoluto não deve ser tratado como probabilidade.",
+  "Latências: reranker de 0,25–0,5 s para 30 pares (conta de FLOPs da P4), NLI de 50–150 ms, LLM via API de 0,5–2 s, LLM local de 1–3 s, MMR < 5 ms. Nenhuma foi medida.",
+  "VRAM: reranker ~1,1 GB fp16 (P4), mDeBERTa ~1 GB fp32 (~276M parâmetros), LLM 7B em 4 bits ~3–5 GB. Nenhuma foi medida.",
+  "Custo do LLM check (~US$ 0,94 por 1.000 consultas): contagem de tokens estimada (8 trechos × 300 + prompt 300; saída 50) sobre o preço oficial do Gemini 3.5 Flash-Lite.",
+  "k_cand = 30 bastar para ~10 mil trechos; o próprio volume de ~10 mil é suposição não confirmada pelo humano.",
+  "k_ger por tipo (8/8/15) e '1 trecho sustenta ~1–3 itens' são pontos de partida, não medições.",
+  "Margem pequena para tema bem coberto e grande para fora com um trecho espúrio: raciocínio, não medido (H5.3).",
+  "A qualidade do NLI mDeBERTa para a hipótese 'Este texto explica {tema}' não foi avaliada (H5.8).",
+  "O cross-encoder ser mais difícil de manipular por instrução no texto do que um LLM: raciocínio, não verificado.",
+  "Limiar de 50% na regra de acerto por sobreposição e orçamento de p95 ≤ 1,0 s: convenções propostas.",
+  "O preço do Cohere Rerank não foi extraído (a página de preços não renderizou); só o modelo de cobrança por busca foi confirmado nas docs.",
+  "O artigo do MMR (Carbonell & Goldstein 1998) foi citado pelo DOI; o texto do PDF não pôde ser extraído nesta pesquisa.",
+  "A regra de três vem de fonte secundária (Wikipedia); a fórmula −ln(α)/n foi conferida na própria página."
+ ],
+ "fontes": [
+  "https://huggingface.co/intfloat/multilingual-e5-large",
+  "https://huggingface.co/BAAI/bge-large-en-v1.5",
+  "https://arxiv.org/abs/1909.00512",
+  "https://huggingface.co/BAAI/bge-reranker-v2-m3",
+  "https://sbert.net/docs/package_reference/cross_encoder/model.html",
+  "https://docs.cohere.com/docs/reranking-best-practices",
+  "https://docs.cohere.com/docs/how-does-cohere-pricing-work",
+  "https://arxiv.org/abs/2401.15884",
+  "https://arxiv.org/abs/2310.11511",
+  "https://arxiv.org/abs/2411.06037",
+  "https://arxiv.org/abs/2309.01431",
+  "https://arxiv.org/abs/2412.12300",
+  "https://arxiv.org/abs/1806.03822",
+  "https://arxiv.org/abs/2407.18418",
+  "https://arxiv.org/abs/2302.09947",
+  "https://arxiv.org/abs/1706.04599",
+  "https://arxiv.org/abs/1705.08500",
+  "https://arxiv.org/abs/2307.03172",
+  "https://www.anthropic.com/engineering/contextual-retrieval",
+  "https://github.com/pgvector/pgvector",
+  "https://ai.google.dev/gemini-api/docs/pricing",
+  "https://huggingface.co/MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7",
+  "https://en.wikipedia.org/wiki/Rule_of_three_(statistics)",
+  "https://doi.org/10.1145/290941.291025"
+ ],
+ "literatura_resumo": {
+  "CRAG": "Avaliador leve (T5-large) pontua cada par (consulta, documento), com limiar superior e inferior: Correct, Incorrect ou Ambiguous. Limiares empíricos por dataset. A ação 'Incorrect → busca na web' não se aplica: no Memorix vira 'recusar', porque o acervo é a única fonte.",
+  "Self-RAG": "Treina o próprio LM para emitir tokens de reflexão sobre recuperar, relevância e suporte. Exige fine-tuning do gerador, e o CRAG mostra que o desempenho cai quando se troca o gerador. Não serve com LLM de provider.",
+  "Sufficient_Context": "Suficiência ≠ relevância ≠ entailment. Autorater LLM tem 93% de acurácia (EN). Com RAG os modelos alucinam mais do que se abstêm. Geração seletiva (confiança + suficiência) melhorou de 2 a 10%.",
+  "RGB": "Rejeição negativa no máximo 45% (EN) e 43,33% (ZH): o gerador não é um gate confiável.",
+  "UAEval4RAG": "Seis categorias de pedidos sem resposta (Underspecified, a mais difícil; False-presupposition; Nonsensical; Modality-limited; Safety; Out-of-Database). Nenhuma combinação de componentes é ótima em todos os datasets, o que reforça calibrar no nosso acervo. Corpus longo e narrativo é mais difícil.",
+  "SQuAD_2.0": "Origem dos benchmarks de 'unanswerable' com negativos adversariais parecidos com os respondíveis. É o análogo dos nossos fora_vizinho.",
+  "Selective_classification": "Arcabouço de risco × cobertura para escolher o limiar pelo risco tolerado, que para nós é FAR ≈ 0."
+ },
+ "colaboracao": {
+  "mensagens": "Enviei o entendimento a todos; P1, P2, P3 e P4 responderam.",
+  "acordos": [
+   "P1 devolve cosseno e ts_rank_cd brutos na fusão.",
+   "P4: k_cand = 30, rastro com logit + sigmoid, latência estimada de 0,25–0,5 s.",
+   "P2 confirma que o cosseno do e5 é comprimido e não serve de limiar portável.",
+   "P3: recall com orçamento de tokens; chunks ≤ 512 tokens."
+  ],
+  "divergencias": [
+   "Nenhuma técnica sem resolução.",
+   "Em aberto, para o orquestrador decidir: proporção inicial 12/8 (40% fora) × 10/10 estrito do pipeline ('balanceados'); ordem das variáveis 1–5, que pode divergir das propostas de P1/P3/P4. Minha única exigência é que a calibração do gate seja sempre a última e refeita após qualquer mudança acima."
+  ]
+ },
+ "revisao_pedagogica_e_decisoes_humanas": [
+  "pedagogy-specialist (via orquestrador): texto da mensagem de recusa ao aluno; o que fazer na cobertura parcial (limitar o nº de itens a n_sup, informar ou recusar); se k_ger = 15 é adequado para aula.",
+  "Humano: qualquer segunda verificação ou reranker via API (a consulta do menor sai; no tier gratuito do Gemini o conteúdo é usado pelo provedor).",
+  "Orquestrador ou humano: orçamento de latência p95 ≤ 1,0 s (proposta)."
+ ],
+ "riscos": [
+  "Aceite indevido em tema vizinho (principal): um trecho de mitose pode pontuar alto para meiose.",
+  "Amostra pequena: FAR = 0 em 8 casos é evidência fraca.",
+  "Truncamento em 512 tokens no reranker.",
+  "A calibração muda quando o acervo cresce: remedir FAR a cada lote novo de material.",
+  "Prompt injection se entrar verificação por LLM (baixo, porque o acervo é só do admin).",
+  "Gerar N itens a partir de poucos trechos, se o teto por n_sup não for adotado."
+ ]
+}

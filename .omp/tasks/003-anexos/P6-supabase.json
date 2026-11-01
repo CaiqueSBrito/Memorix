@@ -1,0 +1,258 @@
+{
+ "pergunta": "P6 — O que o Supabase/pgvector suporta de fato: versão do pgvector, halfvec/sparsevec/bit, iterative scan, limites do HNSW/IVFFlat, extensão no schema extensions e search_path, parâmetros e memória de build, filtro + ANN, FTS portuguese + unaccent, pg_search/BM25, conexão IPv6 × Supavisor, compatibilidade do pgvector-python 0.5.0 + SQLAlchemy 2.1, e se ~10 mil trechos precisam de índice ANN.",
+ "fatos_verificados": {
+  "versao_pgvector_supabase": "0.8.2 é a versão mais nova empacotada na imagem Supabase Postgres. Entrou no commit 79a9d9cd67 ('feat: update pgvector to 0.8.2', 2026-05-22), que já está nos releases 15.14.1.176 e 17.6.1.176 de 2026-09-24 (compare 79a9d9cd67...d907ca5: ahead_by 179, behind_by 0). O versions.json lista 0.4.0 a 0.8.2 para PG15/17. O pgvector.nix gera default_version = a versão mais nova. Fica fora da imagem: 0.8.3 a 0.8.6 (upstream atual 0.8.6, de 2026-07-29), que corrigem corrupção do HNSW em VACUUM concorrente e o erro 'hnsw graph not repaired'.",
+  "recursos_por_versao": "halfvec, sparsevec, índice sobre bit e binary_quantize: 0.7.0. Iterative index scans (hnsw.iterative_scan / ivfflat.iterative_scan): 0.8.0. A 0.8.2 tem os dois grupos.",
+  "limites_indice": "Confirmados no código da 0.8.2 (hnsw.h: HNSW_MAX_DIM 2000, HNSW_MAX_NNZ 1000; hnswutils.c: halfvec maxDimensions = HNSW_MAX_DIM*2, bit = *32). HNSW: vector até 2000 dims, halfvec até 4000, bit até 64000, sparsevec até 1000 não-zeros. IVFFlat: vector 2000, halfvec 4000, bit 64000, sem sparsevec. Sem índice, a coluna guarda até 16000 dims (vector/halfvec) e sparsevec até 16000 não-zeros. Busca exata funciona em qualquer desses tamanhos.",
+  "armazenamento": "vector = 4*d+8 bytes (1024 d → 4104 B). halfvec = 2*d+8 (1024 d → 2056 B). sparsevec = 8*nnz+16. Desde a 0.6.0 o storage do vector é 'external' (TOAST fora da linha).",
+  "hnsw_parametros": "m: padrão 16, faixa 2–100. ef_construction: padrão 64, faixa 4–1000, mínimo 2*m segundo o Supabase. hnsw.ef_search: padrão 40, faixa 1–1000. hnsw.max_scan_tuples: padrão 20000. hnsw.scan_mem_multiplier: padrão 1. Os GUCs hnsw.* são PGC_USERSET (hnsw.c da 0.8.2), então SET e SET LOCAL funcionam para o role postgres sem superuser. Uma consulta HNSW devolve no máximo ef_search linhas.",
+  "memoria_build": "Segundo o README do pgvector, o build é muito mais rápido quando o grafo cabe em maintenance_work_mem; se não couber, sai um NOTICE e o build fica lento, mas não falha. No Supabase, maintenance_work_mem pode ser alterado por CLI e por SQL (custom-postgres-config), inclusive com SET na sessão. Os valores de referência da própria Supabase (gist de 2023, pode estar desatualizado): 64MB em 1 GB de RAM, 128MB em 2 GB, 256MB em 4 GB; max_parallel_maintenance_workers=1 e max_parallel_workers_per_gather=1 nas instâncias compartilhadas.",
+  "filtro_ann": "Com índice aproximado, o WHERE é aplicado depois do scan do índice. Se o filtro casa 10% das linhas e ef_search=40, sobram ~4 linhas em média. A partir da 0.8.0 há iterative scan (strict_order/relaxed_order; padrão off). Alternativas: índice parcial ou particionamento. Busca exata com índice B-tree na coluna do filtro não tem esse problema.",
+  "fts": "unaccent está na lista de extensões do Supabase (packages/shared-data/extensions.json, 66 extensões) e é 'trusted' no PG17. A config portuguese (snowball) vem no core do Postgres. Não existe config 'portuguese sem acento' pronta: é preciso criar uma TS config (padrão da doc do unaccent). Coluna gerada e índice GIN exigem to_tsvector de 2 argumentos (regconfig explícito). O exemplo de hybrid search do Supabase usa tsvector gerado + GIN + RRF com rrf_k=50.",
+  "bm25_pg_search": "Não disponível. pg_search (ParadeDB) e vectorscale não aparecem em extensions.json do Supabase nem em nix/ext do supabase/postgres. Opções lexicais disponíveis: FTS nativo (ts_rank/ts_rank_cd), pg_trgm, rum e pgroonga. Nenhuma delas é BM25.",
+  "schema_e_search_path": "O Supabase manda criar extensões com WITH SCHEMA extensions. O lint 0014 avisa quando uma extensão fica em public, porque ela é exposta na API. vector.control tem relocatable = true, então ALTER EXTENSION vector SET SCHEMA extensions funciona. O init script do Supabase roda ALTER ROLE postgres SET search_path TO \"$user\",public,extensions. Por isso os tipos e opclasses sem qualificação (VECTOR(1024), halfvec_cosine_ops) resolvem para o role postgres.",
+  "conexao": "Direta: db.<ref>.supabase.co:5432, user postgres, só IPv6 (Free e Paid), IPv4 só com o add-on. Supavisor session: aws-<INDEX>-<REGION>.pooler.supabase.com:5432, user postgres.<PROJECT-REF>, IPv4 em todos os planos. O host não pode ser montado a partir da região; copie do diálogo Connect. Supavisor transaction: mesmo host na porta 6543, sem prepared statements e sem estado de sessão. Segundo a doc oficial, 'Direct connections and session mode support all three' (prepared statements, cursores, estado de sessão como SET), e o modo session 'mirrors a direct connection'. Portanto SET hnsw.ef_search por sessão funciona em session mode, e em transaction mode só SET LOCAL dentro da transação. A tabela oficial recomenda a conexão direta para migrations; em rede só IPv4, o session mode é a alternativa indicada para backend persistente. SSL: a doc recomenda sslmode=require (ou verify-full com o certificado). IPv4 add-on: US$ 0,0055/h (~US$ 4/mês), fora do Spend Cap, disponível a partir do plano Pro.",
+  "pgvector_python": "No venv: pgvector 0.5.0 e SQLAlchemy 2.1.0. pgvector.sqlalchemy exporta VECTOR/Vector, HALFVEC, SPARSEVEC e BIT, com comparators l2_distance, max_inner_product, cosine_distance e l1_distance. O changelog da 0.5.0 (2026-07-06) diz 'Dropped support for SQLAlchemy < 2' e 'vector e halfvec retornam list'. O suporte a halfvec/sparsevec no SQLAlchemy existe desde a 0.3.0. SparseVector tem índice 0-based no Python e 1-based no texto do Postgres; to_text faz a conversão. Compilei offline com o dialeto postgresql, sem conectar: sai HALFVEC(1024), SPARSEVEC(250002), TSVECTOR GENERATED ALWAYS AS (...) STORED, CREATE INDEX ... USING hnsw (embedding halfvec_cosine_ops) WITH (m = 16, ef_construction = 64) e ORDER BY embedding <=> %(...)s LIMIT."
+ },
+ "opcoes": [
+  {
+   "nome": "A. Busca exata, sem índice ANN: embedding vector(D) + <=> (RECOMENDADA)",
+   "descricao": "Coluna vector(D) com D definido pela P2; nenhum índice vetorial. SELECT chunk_id, embedding <=> :q AS dist ... ORDER BY dist LIMIT k_cand dentro de um CTE que lê só chunk_id e distância; o texto entra num JOIN depois (issue #744: ler o text no seq scan deixou a consulta ~5x mais lenta). Filtros (doc_id, curso) vão num índice B-tree e o resultado continua exato.",
+   "qualidade_ptbr": "Recall 1,0 do top-k verdadeiro: a qualidade depende só do modelo da P2. As distâncias são exatas, o que ajuda o gate da P5 e o rastro por chunk.",
+   "latencia": "[INFERÊNCIA] 10 mil × 1024 d: ~41 MB de vetores, que cabem no shared_buffers de 256 MB do Micro. Estimativa: ~10–50 ms por consulta no Postgres de CPU compartilhada. O piso de cálculo medido localmente (numpy, 10k×1024 fp32, 12 threads) foi p50 0,8 ms / p95 1,0 ms; o Postgres faz um scan de 1 thread com custo de detoast por tupla, por isso a estimativa é bem mais alta. O Supabase diz que sequential scan tem latência maior, mas cabe em 'small dataset / baixo QPS / precisa de 100% de acurácia'. Medir p95 na 007 com EXPLAIN (ANALYZE, BUFFERS).",
+   "recursos": "Banco: ~41 MB (vector 1024) ou ~20 MB (halfvec) para 10k linhas, sem RAM extra de índice e sem build. No plano Free (Nano): 0,5 GB de RAM e 500 MB de tamanho recomendado de banco; ~10k trechos com texto, tsv e vetor ficam em ~100 MB [INFERÊNCIA]. Sem VRAM (o embedding é da P2).",
+   "licenca": "pgvector: licença PostgreSQL (permissiva). pgvector-python: MIT.",
+   "custo": "Não é API. US$ 0 além do plano Supabase (Free US$ 0; Micro ~US$ 10/mês).",
+   "lgpd": "Não envia dado a nenhum terceiro novo. Vetores e consultas ficam no Supabase, que já foi decidido. O vetor da consulta do aluno não precisa ser persistido.",
+   "compat_pgvector_supabase": "Total com a 0.8.2, com qualquer D ≤ 16000 e com qualquer operador. Migrar para HNSW depois é só CREATE INDEX CONCURRENTLY, sem mudar a coluna.",
+   "fontes": [
+    "https://github.com/pgvector/pgvector#indexing",
+    "https://github.com/pgvector/pgvector#exact-search",
+    "https://supabase.com/docs/guides/ai/going-to-prod",
+    "https://github.com/pgvector/pgvector/issues/744",
+    "https://supabase.com/docs/guides/platform/compute-and-disk",
+    "https://gist.github.com/egor-romanov/323e2847851bbd758081511785573c08"
+   ]
+  },
+  {
+   "nome": "B. vector(D) + HNSW vector_cosine_ops (m=16, ef_construction=64)",
+   "descricao": "Índice ANN padrão recomendado pelo Supabase. Exige D ≤ 2000. A consulta usa SET LOCAL hnsw.ef_search = max(40, k_cand). Com filtro, usa hnsw.iterative_scan = relaxed_order e um CTE materializado.",
+   "qualidade_ptbr": "Recall aproximado: o Supabase reporta ~0,99 nos benchmarks. Devolve no máximo ef_search linhas, e com filtro pode devolver menos que o LIMIT.",
+   "latencia": "Benchmark Supabase, 15k × 1536 d no Micro: p95 16 ms (m=16, ef_c=40, ef_search=40). Para 10k × 1024 é da mesma ordem [INFERÊNCIA]. Ganho sobre a busca exata provavelmente pequeno nessa escala [INFERÊNCIA].",
+   "recursos": "[INFERÊNCIA] Grafo de build ~50 MB (vetor 4,1 KB + ~0,6 KB de vizinhos por elemento × 10k), o que cabe em maintenance_work_mem ≈ 64 MB. Índice em disco da mesma ordem, disputando os 0,5–1 GB de RAM do Nano/Micro.",
+   "licenca": "PostgreSQL (pgvector).",
+   "custo": "US$ 0 (não é API).",
+   "lgpd": "Igual à A.",
+   "compat_pgvector_supabase": "Suportado na 0.8.2. Risco: as correções de corrupção do HNSW em VACUUM com INSERT concorrente (PR #988, issue #993; entraram na 0.8.3/0.8.4) ainda não estão na imagem Supabase 0.8.2.",
+   "fontes": [
+    "https://supabase.com/docs/guides/ai/vector-indexes/hnsw-indexes",
+    "https://supabase.com/docs/guides/ai/choosing-compute-addon",
+    "https://github.com/pgvector/pgvector#hnsw",
+    "https://raw.githubusercontent.com/pgvector/pgvector/v0.8.2/src/hnsw.h",
+    "https://github.com/pgvector/pgvector/blob/master/CHANGELOG.md",
+    "https://github.com/pgvector/pgvector/pull/988",
+    "https://github.com/pgvector/pgvector/issues/993"
+   ]
+  },
+  {
+   "nome": "C. halfvec(D) + HNSW halfvec_cosine_ops (coluna halfvec, ou vector com índice de expressão ::halfvec(D))",
+   "descricao": "Metade do armazenamento. Única forma de indexar 2000 < D ≤ 4000 (por exemplo, 3072 dims de API). Variante de índice de expressão: CREATE INDEX ... USING hnsw ((embedding::halfvec(D)) halfvec_cosine_ops), e a consulta precisa repetir o mesmo cast.",
+   "qualidade_ptbr": "[INFERÊNCIA] fp16 (~3 dígitos significativos) quase não muda o ranking, mas pode trocar a ordem de empates próximos e arredondar o score que o gate da P5 usa. Medir na 007.",
+   "latencia": "Menor working set, com latência igual ou melhor que B [INFERÊNCIA]. Issue #821: com a tabela menor, o planner pode preferir seq scan e ignorar o índice.",
+   "recursos": "~20 MB de vetores e ~30 MB de grafo para 10k × 1024 [INFERÊNCIA].",
+   "licenca": "PostgreSQL.",
+   "custo": "US$ 0.",
+   "lgpd": "Igual à A.",
+   "compat_pgvector_supabase": "Suportado (0.7.0+). O Supabase documenta o exemplo com 3072 dims. Mesmo risco de VACUUM da opção B. HALFVEC existe no pgvector-python 0.5.0.",
+   "fontes": [
+    "https://github.com/pgvector/pgvector#half-precision-vectors",
+    "https://github.com/pgvector/pgvector#half-precision-indexing",
+    "https://supabase.com/docs/guides/ai/vector-indexes/hnsw-indexes",
+    "https://github.com/pgvector/pgvector/issues/821",
+    "https://github.com/pgvector/pgvector-python"
+   ]
+  },
+  {
+   "nome": "D. sparsevec (saída lexical do BGE-M3), exata ou com HNSW sparsevec_ip_ops",
+   "descricao": "Coluna sparse sparsevec(250002) (vocab_size do BGE-M3 = 250002), consultada com <#> (inner product). Só vale se a P2 escolher BGE-M3 e a P1 escolher sparse em vez de FTS. É um ramo lexical que complementa o denso, não o substitui.",
+   "qualidade_ptbr": "Depende do BGE-M3 (P1/P2). Não usa stemmer nem unaccent: o casamento lexical é aprendido pelo modelo.",
+   "latencia": "Exata para 10k: da mesma ordem da A ou menor, porque nnz ≤ ~512 [INFERÊNCIA].",
+   "recursos": "8*nnz+16 bytes: com ≤512 não-zeros, ≤ ~4 KB por trecho [INFERÊNCIA pelo tamanho do chunk da P3]. Precisa rodar o BGE-M3 também na consulta.",
+   "licenca": "PostgreSQL (pgvector). O modelo é da P2.",
+   "custo": "US$ 0 com modelo local.",
+   "lgpd": "Igual à A se o modelo for local.",
+   "compat_pgvector_supabase": "Tipo e HNSW suportados (0.7.0+). No HNSW, o limite é 1000 não-zeros por vetor: um chunk com mais tokens distintos falha no INSERT com 'sparsevec cannot have more than 1000 non-zero elements for hnsw index'. Chunk ≤512 tokens (P3) fica dentro. IVFFlat não suporta sparsevec. SPARSEVEC existe no pgvector-python 0.5.0.",
+   "fontes": [
+    "https://github.com/pgvector/pgvector#sparse-vectors",
+    "https://github.com/pgvector/pgvector/blob/v0.8.2/src/hnswutils.c",
+    "https://huggingface.co/BAAI/bge-m3/blob/main/config.json",
+    "https://github.com/pgvector/pgvector-python/blob/master/CHANGELOG.md"
+   ]
+  },
+  {
+   "nome": "E. (descartada) vector(D) + IVFFlat",
+   "descricao": "lists ≈ rows/1000 (10 para 10k), probes ≈ sqrt(lists). Precisa de dados antes do build.",
+   "qualidade_ptbr": "Recall depende de probes: o Supabase reporta 0,95–0,99 com ≤500k vetores e probes=10.",
+   "latencia": "No Supabase, pior que HNSW na relação velocidade-recall.",
+   "recursos": "Build mais leve que HNSW.",
+   "licenca": "PostgreSQL.",
+   "custo": "US$ 0.",
+   "lgpd": "Igual à A.",
+   "compat_pgvector_supabase": "Suportada, mas o próprio Supabase recomenda HNSW. Com 10k linhas não traz vantagem sobre a busca exata.",
+   "fontes": [
+    "https://github.com/pgvector/pgvector#ivfflat",
+    "https://supabase.com/docs/guides/ai/going-to-prod"
+   ]
+  }
+ ],
+ "recomendacao": {
+  "escolha": "Na 0002, busca EXATA sem índice ANN: coluna embedding extensions.vector(D), com D do modelo da P2 (baseline 1024), operador cosseno <=>, e nenhum índice HNSW/IVFFlat. Ramo lexical: tsv tsvector gerado com a config public.pt_unaccent + índice GIN. Se a P1/P2 fecharem BGE-M3 sparse, entra também sparse extensions.sparsevec(250002), consultada em busca exata.",
+  "justificativa": "(1) Com ~10k trechos (suposição), o Supabase e o pgvector dizem que índice é dispensável quando o dataset é pequeno, o QPS é baixo e se quer 100% de acurácia; a latência estimada fica em dezenas de ms [INFERÊNCIA a medir]. (2) A busca exata devolve o top-k verdadeiro e as distâncias reais. Isso tira da 007 uma variável de confusão (recall do ANN), deixa k_cand > 40 sem mexer em ef_search (P4/P5) e evita o problema de pós-filtro. (3) Evita um risco concreto: a imagem Supabase ainda está na 0.8.2, sem as correções de corrupção do HNSW em VACUUM da 0.8.3/0.8.4. (4) Serve para qualquer D ≤ 16000, então a 0002 não depende do limite de 2000/4000 dims até a 007 escolher o modelo. (5) O caminho para ANN fica aberto sem mudar a coluna: CREATE INDEX CONCURRENTLY ... USING hnsw (embedding vector_cosine_ops) se D ≤ 2000, ou ((embedding::halfvec(D)) halfvec_cosine_ops) se 2000 < D ≤ 4000.",
+  "gatilho_para_indice": "[INFERÊNCIA] Criar HNSW só se a 007 ou a produção medir p95 do ramo denso > 100 ms, ou se o acervo passar de ~100k trechos. Nesse caso: m=16, ef_construction=64, SET LOCAL hnsw.ef_search = max(40, k_cand), hnsw.iterative_scan = relaxed_order com filtro, e checar se a imagem tem pgvector ≥ 0.8.4.",
+  "tipo_vector_vs_halfvec": "vector (fp32) no baseline, para não somar erro de fp16 ao score do gate. halfvec fica como hipótese da 007 (H2), ou obrigatório só se entrar índice com 2000 < D ≤ 4000.",
+  "alternativa_local": "Não se aplica: toda a P6 é local ao banco já decidido (Supabase), sem API nem terceiro novo. Para uma API de 3072 dims, o equivalente é vector(3072) com busca exata; indexar exigiria halfvec. Para D > 4000, só busca exata, binary_quantize ou subvector/MRL."
+ },
+ "impacto_schema_0002": {
+  "confirmacao_0001": "A 0001 (tarefa 002) não muda: tudo abaixo é aditivo (CREATE EXTENSION, TS config, ALTER TABLE chunks ADD COLUMN, CREATE INDEX).",
+  "ddl_proposto": [
+   "CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;",
+   "CREATE EXTENSION IF NOT EXISTS unaccent WITH SCHEMA extensions;",
+   "CREATE TEXT SEARCH CONFIGURATION public.pt_unaccent (COPY = pg_catalog.portuguese);",
+   "ALTER TEXT SEARCH CONFIGURATION public.pt_unaccent ALTER MAPPING FOR hword, hword_part, word WITH extensions.unaccent, pg_catalog.portuguese_stem;  -- padrão da doc do unaccent; a P1 propôs antes um dicionário simple de stopwords (Accept=false). A ordem final é decisão da P1",
+   "ALTER TABLE chunks ADD COLUMN embedding extensions.vector(D);  -- NOT NULL se a 004/008 gravar chunk e embedding na mesma transação; senão nullable e a busca filtra embedding IS NOT NULL (NULL não entra em índice)",
+   "ALTER TABLE chunks ADD COLUMN embedding_model text NOT NULL;  -- decisão da 002 (gate 2, resp. 10/11)",
+   "ALTER TABLE chunks ADD COLUMN tsv tsvector GENERATED ALWAYS AS (to_tsvector('public.pt_unaccent'::regconfig, text)) STORED;",
+   "CREATE INDEX chunks_tsv_gin ON chunks USING gin (tsv);",
+   "-- opcional (só com BGE-M3 sparse): ALTER TABLE chunks ADD COLUMN sparse extensions.sparsevec(250002);",
+   "-- SEM índice HNSW/IVFFlat na 0002. DDL futuro: CREATE INDEX CONCURRENTLY chunks_embedding_hnsw ON chunks USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);"
+  ],
+  "alembic_sqlalchemy": "Extensões e TS config via op.execute. Colunas com pgvector.sqlalchemy.VECTOR(D)/HALFVEC(D)/SPARSEVEC(dim), com import pgvector.sqlalchemy no script.py.mako. tsv com sqlalchemy.Computed(persisted=True) e postgresql.TSVECTOR. Índice com postgresql_using/postgresql_with/postgresql_ops. Compilação offline verificada com SQLAlchemy 2.1.0 + pgvector 0.5.0. O DDL sai sem schema (VECTOR(1024)) e resolve pelo search_path do role postgres, que inclui extensions. CREATE INDEX CONCURRENTLY não roda dentro de transação: no Alembic, usar autocommit_block.",
+  "consulta_recomendada": "WITH nn AS MATERIALIZED (SELECT chunk_id, embedding <=> :q AS dist FROM chunks [WHERE filtro] ORDER BY dist LIMIT :k_cand) SELECT c.chunk_id, c.doc_id, c.text, nn.dist FROM nn JOIN chunks c USING (chunk_id) ORDER BY nn.dist;  -- o texto é lido só para os k_cand trechos"
+ },
+ "riscos_operacionais": [
+  {
+   "risco": "IPv6 da conexão direta",
+   "detalhe": "db.<ref>.supabase.co só tem AAAA e não resolve nesta máquina (fato do Build002Test/Orch002). Documentação oficial: a conexão direta é só IPv6 sem o add-on.",
+   "mitigacao": "Usar o Supavisor em modo session: postgresql+psycopg2://postgres.<PROJECT-REF>:<senha>@aws-<INDEX>-<REGION>.pooler.supabase.com:5432/postgres?sslmode=require, com host copiado do diálogo Connect. O modo aceita prepared statements e estado de sessão (SET hnsw.ef_search), então Alembic e DDL funcionam [INFERÊNCIA para DDL: a doc diz 'mirrors a direct connection', mas não cita DDL explicitamente]. A doc prefere a conexão direta para migrations; a alternativa paga é o IPv4 add-on (~US$ 4/mês, plano Pro, fora do Spend Cap). NÃO usar transaction mode (6543) com SET de sessão. Pool: em session mode cada conexão do pool do SQLAlchemy ocupa um backend enquanto está aberta (Nano: 60 conexões máx.; o pooler aceita 200 clientes). Recomendo pool_size pequeno + pool_pre_ping. A recomendação de NullPool do painel não foi confirmada em doc oficial [INFERÊNCIA]: NullPool só é necessário em transaction mode; em session mode, o Supavisor fecha o backend quando o cliente desconecta, então com NullPool cada checkout paga TLS e um backend novo [INFERÊNCIA]. Trocar o .env é decisão do humano."
+  },
+  {
+   "risco": "Versão real da extensão no projeto",
+   "detalhe": "A imagem atual traz a 0.8.2, mas um projeto antigo pode estar numa imagem anterior. A doc de extensões diz que versão nova exige software upgrade/restart em Settings.",
+   "mitigacao": "Antes da 0002 (na 008), rodar SELECT extversion FROM pg_extension WHERE extname='vector' e SELECT version FROM pg_available_extension_versions WHERE name='vector'. Exigir ≥ 0.7.0 (halfvec/sparsevec) e ≥ 0.8.0 se houver índice com filtro."
+  },
+  {
+   "risco": "Extensão no schema errado / search_path",
+   "detalhe": "CREATE EXTENSION sem WITH SCHEMA cai em public, o que gera o aviso do lint 0014 e expõe as funções na API. Funções SQL com SET search_path = '' não enxergam o tipo nem os operadores sem qualificação.",
+   "mitigacao": "WITH SCHEMA extensions. Em funções: SET search_path = public, extensions, ou qualificar extensions.vector e OPERATOR(extensions.<=>). Se a extensão já estiver em public: ALTER EXTENSION vector SET SCHEMA extensions (relocatable = true)."
+  },
+  {
+   "risco": "Memória de build do HNSW (se e quando for criado)",
+   "detalhe": "Com o grafo fora de maintenance_work_mem, o build fica muito mais lento, mas não falha. Instâncias pequenas: ~64–128 MB (gist Supabase 2023, possivelmente desatualizado) e 0,5–1 GB de RAM total. max_parallel_maintenance_workers=1.",
+   "mitigacao": "[INFERÊNCIA] Para 10k × 1024 o grafo fica em ~50 MB (vector) ou ~30 MB (halfvec) e cabe. Se precisar: SET maintenance_work_mem = '128MB' só na sessão do build, nunca perto da RAM total. Criar o índice depois da carga, com CONCURRENTLY."
+  },
+  {
+   "risco": "Bugs de HNSW não corrigidos na 0.8.2",
+   "detalhe": "Corrupção em VACUUM com INSERT concorrente e o erro 'hnsw graph not repaired', corrigidos na 0.8.3/0.8.4 (junho de 2026). A imagem Supabase está na 0.8.2.",
+   "mitigacao": "Sem HNSW na 0002 (a recomendação). Se o índice vier depois, confirmar que a imagem já tem ≥ 0.8.4, ou reindexar em janela sem ingestão."
+  },
+  {
+   "risco": "HNSW corta resultados",
+   "detalhe": "O HNSW devolve no máximo ef_search linhas (padrão 40), o filtro vem depois do scan, e dead tuples reduzem o resultado.",
+   "mitigacao": "Busca exata na 0002. Com índice: SET LOCAL hnsw.ef_search = max(40, k_cand) e iterative_scan com filtro."
+  },
+  {
+   "risco": "Leitura do texto no seq scan",
+   "detalhe": "Selecionar text (TOAST) junto com a distância obriga a ler e ordenar linhas largas (issue #744: 7 s × 1,5 s em 600k linhas).",
+   "mitigacao": "CTE só com chunk_id e distância, e JOIN do texto depois (ver consulta_recomendada)."
+  },
+  {
+   "risco": "Tamanho do banco no plano Free",
+   "detalhe": "Nano: tamanho recomendado de banco de 500 MB e 0,5 GB de RAM.",
+   "mitigacao": "[INFERÊNCIA] ~10k trechos ficam em ~100 MB com vector(1024). Com 3072 dims + sparse, reavaliar."
+  },
+  {
+   "risco": "Driver",
+   "detalhe": "Com URL postgresql://, o SQLAlchemy 2.1 escolhe o psycopg v3, que não está no venv (achado do Build002Test).",
+   "mitigacao": "Usar postgresql+psycopg2:// explícito no database.py e no env.py."
+  }
+ ],
+ "hipoteses_para_007": [
+  "H1 — Trocar a busca exata por HNSW (m=16, ef_construction=64, ef_search=max(40,k_cand)) reduz a latência p95 do ramo denso sem piorar o recall@5 em mais de 0,01 absoluto e mantendo o overlap do top-k_cand com a busca exata ≥ 0,99. Critério: adotar só se a p95 da busca exata for > 100 ms.",
+  "H2 — Guardar halfvec(D) em vez de vector(D) reduz a tabela em ~50% e a p95 da busca exata, sem mudar recall@5 nem MRR@10 em mais de 0,005 e com top-5 idêntico em ≥ 99% das consultas.",
+  "H3 — A config pt_unaccent, comparada à portuguese pura, melhora o recall@5 do ramo lexical em consultas digitadas sem acento (ex.: 'funcao', 'equacao') sem piorar o MRR@10 nas consultas com acento. Métrica separada por subconjunto 'sem acento' × 'com acento'.",
+  "H4 — Um CTE que lê só chunk_id e distância, com JOIN do texto depois, reduz a p95 do retrieval em ≥ 30% frente ao SELECT com text no mesmo scan, com resultado idêntico.",
+  "H5 (se BGE-M3) — sparse exato (sparsevec <#>) no lugar do FTS pt_unaccent como ramo lexical do RRF melhora o recall@5 do híbrido sem aumentar a p95 em mais de 20 ms (a variável é da P1; a P6 só confirma a viabilidade)."
+ ],
+ "dependencias_com_outras_perguntas": {
+  "P2": "D fecha o tipo. Com busca exata qualquer D ≤ 16000 serve. Para índice futuro: D ≤ 2000 → vector+HNSW; 2000 < D ≤ 4000 → halfvec; D > 4000 → binary_quantize/subvector (MRL) ou só busca exata.",
+  "P1": "pg_search/BM25 não existe no Supabase: o ramo lexical é FTS nativo (ts_rank_cd) com pt_unaccent, ou sparse do BGE-M3. O exemplo do Supabase usa rrf_k=50; a P1 fica com 60 (Cormack 2009). Divergência registrada, mas não é crítica.",
+  "P3": "Chunk ≤ 512 tokens mantém o sparsevec abaixo de 1000 não-zeros (limite do HNSW). O tsv é gerado do mesmo chunks.text.",
+  "P4": "Pool de candidatos k_cand > 40 só com ef_search maior ou com busca exata. Com a busca exata recomendada não há restrição.",
+  "P5": "A busca exata devolve a distância de cosseno real por chunk para o gate e o log. Com halfvec o score perde precisão (H2).",
+  "002/004/008": "Conexão via Supavisor session (IPv4) ou IPv4 add-on. A 0002 só depois da 007 fixar D. Na 004, embedding e chunk na mesma transação de reingestão."
+ },
+ "divergencias": [
+  "Com a 1ª rodada do ai-rag-specialist na 002 (HNSW vector_cosine_ops m=16/ef_c=64 'válido para a 008'): proponho NÃO criar índice ANN na 0002 para ~10k trechos (busca exata). O HNSW fica atrás de um gatilho medido (H1).",
+  "Com o painel do Supabase (via Orch002), que recomenda NullPool: não verifiquei essa recomendação em doc oficial. Em session mode o NullPool não é necessário e custa uma conexão nova por checkout [INFERÊNCIA]. O NullPool faz sentido no transaction mode."
+ ],
+ "evidencia_local": [
+  "Verificado no venv: pgvector 0.5.0 (dist-info) e SQLAlchemy 2.1.0. pgvector/sqlalchemy/__init__.py exporta HALFVEC, SPARSEVEC, BIT e VECTOR.",
+  "Compilação offline do DDL (sem banco): HALFVEC(1024), SPARSEVEC(250002), TSVECTOR GENERATED ALWAYS AS (to_tsvector('public.pt_unaccent'::regconfig, text)) STORED, CREATE INDEX ... USING hnsw (embedding halfvec_cosine_ops) WITH (m = 16, ef_construction = 64), CREATE INDEX ... USING gin (tsv), SparseVector({5:0.3,17:0.9},250002).to_text() = '{6:0.3,18:0.9}/250002'.",
+  "Piso de cálculo (numpy local, não é o Postgres): 10k × 1024 fp32 com produto escalar + top-50: p50 0,79 ms / p95 1,00 ms."
+ ],
+ "inferencias": [
+  "Volume de ~10 mil trechos: suposição da tarefa, não confirmada pelo humano.",
+  "Latência da busca exata no Postgres do Supabase (~10–50 ms para 10k × 1024): estimativa, não medida. Medir na 007 com EXPLAIN (ANALYZE, BUFFERS).",
+  "Versão do pgvector no projeto específico do .env: não consultada (banco proibido). Só a imagem Supabase atual está verificada (0.8.2).",
+  "maintenance_work_mem/shared_buffers reais do projeto: os números vêm do gist de 2023 da Supabase e podem ter mudado. O template atual do repositório só mostra {{.MaintenanceWorkMem}}.",
+  "Tamanho do grafo HNSW (~50 MB vector / ~30 MB halfvec para 10k × 1024): cálculo aproximado pelas structs do hnsw.h, não medido.",
+  "Efeito do fp16 (halfvec) no ranking e no score do gate: não medido.",
+  "DDL/Alembic via Supavisor session: deduzido de 'mirrors a direct connection' e do suporte a prepared statements e estado de sessão. A doc não cita DDL explicitamente e recomenda a conexão direta para migrations.",
+  "Recomendação de NullPool 'do painel': não encontrada em doc oficial. A busca no repositório de docs estourou o tempo.",
+  "Stemmer portuguese aplicado a texto já sem acento pode stemizar um pouco pior. Como consulta e documento passam pela mesma config, o efeito é simétrico. Não medido (H3).",
+  "Tamanho total do banco com 10k trechos (~100 MB): estimativa.",
+  "Não verificado: se o Supabase oferece região no Brasil (sa-east-1) para o projeto, relevante para a LGPD."
+ ],
+ "fontes": [
+  "https://github.com/pgvector/pgvector",
+  "https://github.com/pgvector/pgvector/blob/master/CHANGELOG.md",
+  "https://raw.githubusercontent.com/pgvector/pgvector/v0.8.2/src/hnsw.h",
+  "https://github.com/pgvector/pgvector/blob/v0.8.2/src/hnswutils.c",
+  "https://github.com/pgvector/pgvector/blob/v0.8.2/src/hnsw.c",
+  "https://raw.githubusercontent.com/pgvector/pgvector/v0.8.2/vector.control",
+  "https://github.com/pgvector/pgvector/blob/master/LICENSE",
+  "https://github.com/pgvector/pgvector/issues/744",
+  "https://github.com/pgvector/pgvector/issues/821",
+  "https://github.com/pgvector/pgvector/pull/988",
+  "https://github.com/pgvector/pgvector/issues/993",
+  "https://github.com/pgvector/pgvector-python",
+  "https://github.com/pgvector/pgvector-python/blob/master/CHANGELOG.md",
+  "https://github.com/supabase/postgres/blob/develop/nix/ext/versions.json",
+  "https://github.com/supabase/postgres/blob/develop/nix/ext/pgvector.nix",
+  "https://github.com/supabase/postgres/commit/79a9d9cd67",
+  "https://github.com/supabase/postgres/blob/develop/ansible/vars.yml",
+  "https://github.com/supabase/postgres/releases/tag/17.6.1.176",
+  "https://github.com/supabase/postgres/blob/develop/migrations/db/init-scripts/00000000000003-post-setup.sql",
+  "https://github.com/supabase/supabase/blob/master/packages/shared-data/extensions.json",
+  "https://github.com/supabase/splinter/blob/main/docs/0014_extension_in_public.md",
+  "https://supabase.com/docs/guides/database/extensions/pgvector",
+  "https://supabase.com/docs/guides/database/extensions",
+  "https://supabase.com/docs/guides/ai/vector-indexes/hnsw-indexes",
+  "https://supabase.com/docs/guides/ai/hybrid-search",
+  "https://supabase.com/docs/guides/ai/going-to-prod",
+  "https://supabase.com/docs/guides/ai/choosing-compute-addon",
+  "https://supabase.com/docs/guides/database/connecting-to-postgres",
+  "https://supabase.com/docs/guides/database/connecting-to-postgres/pooling-and-limits",
+  "https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI",
+  "https://supabase.com/docs/guides/platform/ipv4-address",
+  "https://supabase.com/docs/guides/platform/manage-your-usage/ipv4",
+  "https://supabase.com/docs/guides/platform/compute-and-disk",
+  "https://supabase.com/docs/guides/database/custom-postgres-config",
+  "https://gist.github.com/egor-romanov/323e2847851bbd758081511785573c08",
+  "https://supabase.com/blog/fewer-dimensions-are-better-pgvector",
+  "https://www.postgresql.org/docs/17/unaccent.html",
+  "https://www.postgresql.org/docs/17/textsearch-tables.html",
+  "https://www.postgresql.org/docs/17/textsearch-dictionaries.html",
+  "https://huggingface.co/BAAI/bge-m3/blob/main/config.json"
+ ]
+}

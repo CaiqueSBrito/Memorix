@@ -1,0 +1,253 @@
+{
+ "pergunta": "P4 — Reranker: usar ou não no MVP; local ou API; quantos candidatos; o score serve de sinal para o gate de suficiência (P5)?",
+ "opcoes": [
+  {
+   "nome": "Sem reranker (baseline)",
+   "descricao": "A ordem final é a da fusão de P1 (RRF denso + FTS). É o baseline da 007.",
+   "qualidade_ptbr": "Depende só de P1/P2. RRF é fusão por posição: não produz score absoluto, então não serve ao gate de P5 (P1 e P5 concordaram).",
+   "latencia": "0 ms adicionais.",
+   "recursos": "Nenhum.",
+   "licenca": "n/a",
+   "custo": "US$ 0",
+   "lgpd": "Não cria novo operador de dados.",
+   "compat_pgvector_supabase": "Total. Nada muda no banco.",
+   "fontes": []
+  },
+  {
+   "nome": "BAAI/bge-reranker-v2-m3 (local, cross-encoder pointwise)",
+   "descricao": "Cross-encoder XLM-RoBERTa derivado do bge-m3, com 567.755.777 parâmetros. Devolve um logit por par (consulta, trecho); sigmoid leva a [0,1] (compute_score com normalize=True). Os exemplos do card usam max_length=512.",
+   "qualidade_ptbr": "Não há benchmark PT isolado. Números multilíngues, todos de fabricantes concorrentes: MKQA (26 línguas, inclui pt) nDCG@10 54,17 contra 54,83 do jina-v2 (card do jina-v2); MKQA 67,88, o 2º melhor, e MIRACL 69,32, o 1º, na tabela do jina-v3 (o MIRACL não inclui português); MMTEB-R 58,36 contra 66,36 do Qwen3-Reranker-0.6B (tabela da Qwen). Os fabricantes se contradizem, então só a 007 decide.",
+   "latencia": "[INFERÊNCIA por FLOPs, sem medição] Corpo de ~311M parâmetros (sem a matriz de vocabulário de 256M). 30 pares × ~350 tokens ≈ 6 TFLOP. A 4050 Laptop tem 194 AI TOPS, o que dá ~12–24 TFLOPS fp16 efetivos. Estimativa: ~0,25–0,5 s com 30 candidatos, ~0,17–0,35 s com 20, ~0,4–0,8 s com 50.",
+   "recursos": "Pesos fp16 ≈ 1,14 GB. Com o bge-m3 de embedding (outros ≈ 1,14 GB) + contexto CUDA + ativações de lote 30×512, o total fica em ~3–3,5 GB e cabe em 6 GiB [INFERÊNCIA]. Deixa de caber se um LLM local de geração dividir a GPU.",
+   "licenca": "Apache-2.0 (verificado na API do HF).",
+   "custo": "US$ 0 por busca (só energia).",
+   "lgpd": "A consulta do aluno (possível menor) não sai da máquina. É o melhor cenário.",
+   "compat_pgvector_supabase": "Independente do banco: roda na aplicação sobre o texto de chunks.text devolvido pela busca.",
+   "fontes": [
+    "https://huggingface.co/BAAI/bge-reranker-v2-m3",
+    "https://huggingface.co/api/models/BAAI/bge-reranker-v2-m3",
+    "https://huggingface.co/jinaai/jina-reranker-v2-base-multilingual",
+    "https://huggingface.co/jinaai/jina-reranker-v3",
+    "https://huggingface.co/Qwen/Qwen3-Reranker-0.6B",
+    "https://huggingface.co/datasets/apple/mkqa",
+    "https://huggingface.co/datasets/miracl/miracl",
+    "https://www.nvidia.com/en-us/geforce/laptops/compare/"
+   ]
+  },
+  {
+   "nome": "Qwen/Qwen3-Reranker-0.6B (local, LLM-based pointwise)",
+   "descricao": "595.776.512 parâmetros, 28 camadas, contexto de 32k. Score = P(yes) em [0,1] com instrução; o card recomenda instrução em inglês.",
+   "qualidade_ptbr": "Em números da própria Qwen (top-100 do Qwen3-Embedding-0.6B): MMTEB-R 66,36 contra 58,36 do bge-v2-m3; MTEB-R 65,80 contra 57,03. Na tabela do jina-v3: MIRACL 57,70 e MKQA 65,34, abaixo do bge-v2-m3. Sem número PT isolado.",
+   "latencia": "[INFERÊNCIA] Corpo de ~440M parâmetros + ~70 tokens de prompt fixo, ou seja ~1,5–2× o bge-v2-m3: ~0,4–0,9 s com 30 candidatos. O card recomenda flash_attention_2, de instalação difícil no Windows [INFERÊNCIA].",
+   "recursos": "Pesos bf16/fp16 ≈ 1,19 GB. Cabe junto do embedding.",
+   "licenca": "Apache-2.0.",
+   "custo": "US$ 0",
+   "lgpd": "Local.",
+   "compat_pgvector_supabase": "Independente do banco.",
+   "fontes": [
+    "https://huggingface.co/Qwen/Qwen3-Reranker-0.6B",
+    "https://qwenlm.github.io/blog/qwen3-embedding/",
+    "https://huggingface.co/jinaai/jina-reranker-v3"
+   ]
+  },
+  {
+   "nome": "Alibaba-NLP/gte-multilingual-reranker-base (local, cross-encoder leve; alternativa rápida)",
+   "descricao": "305.959.681 parâmetros, encoder base.",
+   "qualidade_ptbr": "MMTEB-R 59,44 contra 58,36 do bge-v2-m3 na tabela da Qwen. Sem número PT.",
+   "latencia": "[INFERÊNCIA] Corpo de ~110M parâmetros, ~3× mais rápido que o bge-v2-m3: ~0,08–0,2 s com 30 candidatos.",
+   "recursos": "fp16 ≈ 0,6 GB.",
+   "licenca": "Apache-2.0 (API do HF).",
+   "custo": "US$ 0",
+   "lgpd": "Local.",
+   "compat_pgvector_supabase": "Independente do banco.",
+   "fontes": [
+    "https://huggingface.co/api/models/Alibaba-NLP/gte-multilingual-reranker-base",
+    "https://qwenlm.github.io/blog/qwen3-embedding/"
+   ]
+  },
+  {
+   "nome": "BAAI/bge-reranker-v2-gemma / bge-reranker-v2-minicpm-layerwise (local, LLM 2B+)",
+   "descricao": "Rerankers LLM do BAAI, que o card indica 'for better performance'.",
+   "qualidade_ptbr": "O card cita avaliação no MIRACL (imagem, sem número extraível) e não traz PT.",
+   "latencia": "[INFERÊNCIA] ~5–8× o bge-v2-m3.",
+   "recursos": "gemma: 2.506.172.416 parâmetros, ≈ 5,0 GB em fp16. minicpm: 2.724.956.928 parâmetros, ≈ 5,45 GB em fp16. NÃO cabem na 4050 de 6 GiB junto do modelo de embedding; só com quantização 4-bit, fora do escopo. Descartados.",
+   "licenca": "Tag do HF: Apache-2.0. Base gemma-2b segue os Gemma Terms of Use; base MiniCPM tem licença própria [INFERÊNCIA: a derivação herda restrições].",
+   "custo": "US$ 0",
+   "lgpd": "Local.",
+   "compat_pgvector_supabase": "Independente do banco.",
+   "fontes": [
+    "https://huggingface.co/BAAI/bge-reranker-v2-gemma",
+    "https://huggingface.co/api/models/BAAI/bge-reranker-v2-gemma",
+    "https://huggingface.co/api/models/BAAI/bge-reranker-v2-minicpm-layerwise"
+   ]
+  },
+  {
+   "nome": "jinaai/jina-reranker-v2-base-multilingual e jina-reranker-v3 (pesos locais)",
+   "descricao": "v2: 278M parâmetros, cross-encoder, contexto de 1024. v3/v3.5: 0,6B, listwise (compara todos os documentos numa janela).",
+   "qualidade_ptbr": "v2: MKQA 54,83. v3: MKQA 67,92, MIRACL 66,83 (números da Jina).",
+   "latencia": "v2 [INFERÊNCIA]: rápido, como o gte-base. Usa flash-attn por padrão; use_flash_attn=False se falhar.",
+   "recursos": "v2 ≈ 0,56 GB; v3 ≈ 1,2 GB.",
+   "licenca": "CC-BY-NC-4.0 nos dois (verificado): proíbe uso comercial local sem contrato. Descartados como pesos locais.",
+   "custo": "n/a local",
+   "lgpd": "Local, mas bloqueado pela licença.",
+   "compat_pgvector_supabase": "Independente do banco. Atenção: o v3 é listwise, então o score de um trecho depende dos outros da lista e é pior como limiar absoluto do gate [INFERÊNCIA pela arquitetura descrita no card].",
+   "fontes": [
+    "https://huggingface.co/jinaai/jina-reranker-v2-base-multilingual",
+    "https://huggingface.co/jinaai/jina-reranker-v3"
+   ]
+  },
+  {
+   "nome": "mixedbread-ai/mxbai-rerank-base-v2 / large-v2 (local)",
+   "descricao": "Base: 494M parâmetros (Qwen2). Large: 1,54B. RL + contraste (ProRank). O card lista pt entre 100+ línguas.",
+   "qualidade_ptbr": "Coluna 'Multilingual' do card: 28,56 (base) e 29,79 (large). Na tabela do jina-v3: base MIRACL 55,32 e MKQA 64,24, abaixo do bge-v2-m3 no multilíngue. Pontos fortes: inglês, chinês e código.",
+   "latencia": "O card informa 0,67 s (base) e 0,89 s (large) numa A100, com carga não especificada. Na 4050 [INFERÊNCIA]: base parecido com o Qwen3-0.6B.",
+   "recursos": "base fp16 ≈ 0,99 GB; large ≈ 3,1 GB (apertado com o embedding).",
+   "licenca": "Apache-2.0.",
+   "custo": "US$ 0",
+   "lgpd": "Local.",
+   "compat_pgvector_supabase": "Independente do banco.",
+   "fontes": [
+    "https://huggingface.co/mixedbread-ai/mxbai-rerank-base-v2",
+    "https://arxiv.org/abs/2506.03487",
+    "https://huggingface.co/jinaai/jina-reranker-v3"
+   ]
+  },
+  {
+   "nome": "Cohere Rerank (API): rerank-v3.5 / rerank-v4.0-fast|pro",
+   "descricao": "v3.5: contexto de 4096, 'performs well in English and non-English'. v4.0: contexto de 32.768, multilíngue. Devolve relevance_score normalizado em [0,1].",
+   "qualidade_ptbr": "Não há benchmark PT público primário. Alegação do fabricante: multilíngue, 100+ línguas.",
+   "latencia": "[INFERÊNCIA] ~150–400 ms: ida e volta Brasil↔EUA + inferência. Sem uso de GPU local.",
+   "recursos": "Nenhum local.",
+   "licenca": "Serviço proprietário.",
+   "custo": "Página oficial: rerank a US$ 2,00 e US$ 2,50 por 1K buscas nos modelos v4.0 [INFERÊNCIA: qual preço é do fast e qual é do pro]. 1 busca = 1 consulta com até 100 documentos. Documento com consulta acima de 500 tokens é dividido e conta a mais. Com 30 candidatos de ~300 tokens: US$ 2,00–2,50 por 1k buscas, ~US$ 20–25/mês a 10k buscas. Preço do v3.5 não está na página atual [INFERÊNCIA: US$ 2/1K].",
+   "lgpd": "Envia a consulta (possível texto de menor) e os trechos para os EUA/Canadá, o que é transferência internacional (LGPD art. 33) e envolve dado de criança/adolescente (art. 14). Cohere: prompts e gerações ficam em log e são apagados após 30 dias, com exceções; opt-out de treino no painel; retenção zero só com aprovação. É decisão do humano.",
+   "compat_pgvector_supabase": "Independente do banco.",
+   "fontes": [
+    "https://docs.cohere.com/docs/rerank",
+    "https://docs.cohere.com/docs/reranking-best-practices.md",
+    "https://docs.cohere.com/docs/how-does-cohere-pricing-work.md",
+    "https://cohere.com/pricing",
+    "https://cohere.com/data-usage-policy"
+   ]
+  },
+  {
+   "nome": "Voyage AI Rerank (API): rerank-2 (legado), rerank-2.5 / 2.5-lite, rerank-3 (preview)",
+   "descricao": "Contexto de 32k (2.5/3) e 16k (rerank-2). Multilíngue, com instruções (2.5). Devolve relevance_score.",
+   "qualidade_ptbr": "Sem benchmark PT primário verificado. Alegação: multilíngue.",
+   "latencia": "[INFERÊNCIA] ~150–400 ms, com rede.",
+   "recursos": "Nenhum local.",
+   "licenca": "Serviço proprietário.",
+   "custo": "Cobra por tokens = tokens da consulta × nº de documentos + tokens dos documentos. rerank-2.5: US$ 0,05/1M; 2.5-lite: US$ 0,02/1M; rerank-2: US$ 0,05/1M; rerank-3: US$ 0,05/1M, com 200M tokens grátis enquanto está em preview. Com 30 candidatos × 300 tokens e consulta de 30 tokens, dá ≈ 9.900 tokens por busca: ≈ US$ 0,50 (2.5) ou US$ 0,20 (lite) por 1k buscas.",
+   "lgpd": "FAQ oficial: por padrão a Voyage guarda e usa os dados para treino. O opt-out (exige administrador e cartão cadastrado) dá retenção zero. Mesma questão de transferência internacional e dado de menor. É decisão do humano.",
+   "compat_pgvector_supabase": "Independente do banco.",
+   "fontes": [
+    "https://docs.voyageai.com/docs/reranker",
+    "https://docs.voyageai.com/docs/pricing",
+    "https://docs.voyageai.com/docs/faq"
+   ]
+  },
+  {
+   "nome": "Jina Reranker API (jina-reranker-v2/v3/v3.5)",
+   "descricao": "API que licencia o uso comercial dos modelos CC-BY-NC.",
+   "qualidade_ptbr": "Os mesmos números de fabricante da Jina (MKQA do v3: 67,92).",
+   "latencia": "[INFERÊNCIA] ~150–400 ms, com rede.",
+   "recursos": "Nenhum local.",
+   "licenca": "Serviço proprietário. Uso comercial permitido via API.",
+   "custo": "Cobra por tokens em pacotes pré-pagos. Não consegui extrair o preço (a página renderiza por JS) [INFERÊNCIA: ordem de US$ 0,02–0,05/1M tokens, ~US$ 0,2–0,5 por 1k buscas].",
+   "lgpd": "Termos da Jina (GmbH, Alemanha): 4.6, Input/Output só é guardado 'to the extent required to provide the Services'; 10.4, não usa os dados das requisições para treino. Mesmo assim é transferência a terceiro e envolve dado de menor. É decisão do humano.",
+   "compat_pgvector_supabase": "Independente do banco.",
+   "fontes": [
+    "https://jina.ai/reranker/",
+    "https://jina.ai/legal/"
+   ]
+  }
+ ],
+ "recomendacao": {
+  "decisao": "Incluir o reranker no desenho do MVP como etapa opcional ligada por configuração. Modelo: BAAI/bge-reranker-v2-m3, LOCAL na RTX 4050, fp16, max_length=512, sobre os 30 primeiros candidatos (k_cand=30) da fusão de P1. A adoção definitiva depende da medição na 007. Não entra na 004 (ingestão/chunking); a implementação fica para a tarefa de retrieval depois da 007 (goal proposto 1.3, Retrieval medido).",
+  "justificativa": [
+   "O reranker é o sinal mais forte que P5 tem para o gate 'não está no acervo'. RRF é só posição e o cosseno varia por modelo (P2 e P5 concordam). Um cross-encoder pointwise dá um score absoluto por par, calibrável com casos fora_do_acervo. Sem reranker, o gate fica sem sinal portável.",
+   "O bge-reranker-v2-m3 é o único candidato ao mesmo tempo Apache-2.0, multilíngue com bom resultado em MKQA/MIRACL, com máximo de 512 tokens compatível com o chunk alvo de ~300 tokens de P3, e que cabe na VRAM junto de um embedding de ~0,6B (~3–3,5 GB no total).",
+   "Local mantém a consulta do aluno (possível menor) fora de terceiros. O custo das APIs é irrisório (US$ 0,2–2,5 por 1k buscas); o bloqueio é LGPD, não dinheiro.",
+   "k_cand=30: o custo cresce linearmente (~0,25–0,5 s estimados). 20 costuma perder recall, 50 dobra a latência. 20/30/50 é variável da 007, uma por vez, depois de decidir se o reranker entra."
+  ],
+  "alternativa_local": "Desafiante de qualidade: Qwen3-Reranker-0.6B (Apache-2.0, ~1,2 GB). Fica com a vaga se ganhar MRR@10 ≥ 0,03 sobre o bge com p95 ≤ 1,5×. Fallback rápido: gte-multilingual-reranker-base (Apache-2.0, ~0,6 GB), se a latência do bge estourar o orçamento.",
+  "alternativa_api_se_humano_autorizar": "Cohere rerank-v4.0-fast ou v3.5: retenção de 30 dias, ou zero se aprovada. Ou Voyage rerank-2.5-lite com opt-out ativado (retenção zero; sem opt-out os dados vão para treino). Só vale se a 007 mostrar ganho de MRR@10 ≥ 0,03 sobre o melhor reranker local. Envio de dados a terceiro é decisão do humano.",
+  "rastro_obrigatorio": "Na etapa Reranking de rag-rastreabilidade.md, registrar: modelo + revisão (hash do commit do HF), max_length, k_cand, ordem antes → depois (chunk_id), logit bruto e sigmoid por chunk, duracao_ms. Nunca registrar o texto da consulta, só o hash (vale para menor)."
+ },
+ "candidatos_ao_reranker": "30 por padrão (pool fundido de P1; P1 entrega N de 30 a 50). A 007 testa 20/30/50 depois de adotar o reranker. A geração recebe k_ger por tipo, definido por P5 (5–8 para flashcard/questão, 10–12 para aula).",
+ "score_como_sinal_do_gate_P5": "Sim, com ressalvas. (1) Usar o score de um modelo pointwise (bge-v2-m3, Qwen3, Cohere, Voyage). Evitar listwise (jina-v3), cujo score depende dos outros candidatos [INFERÊNCIA]. (2) Nenhum fabricante calibra o score para PT. A própria Cohere manda calibrar o limiar com 30–50 consultas do domínio, então o limiar sai da 007 com os casos fora_do_acervo, calibrado sobre o logit bruto (pedido de P5). (3) O limiar é por modelo e versão: trocar de reranker invalida o limiar. (4) Se a 007 mostrar que o reranker não melhora a ordem, ainda dá para usá-lo só como avaliador do gate sobre o top-k_ger (5–8 pares, ~50–120 ms [INFERÊNCIA]).",
+ "impacto_schema_0002": {
+  "obrigatorio": "Nenhum. O reranker não cria coluna nem índice: o score é por (consulta, trecho) e vai para o rastro JSONL, não para o banco. A 0001 da 002 não muda.",
+  "opcional_dependente_de_P3": "Se P3 guardar título/seção do documento (ex.: coluna chunks.heading_path ou documents.title), o texto enviado ao reranker pode ser 'título > seção\\n' + chunks.text [INFERÊNCIA: costuma ajudar trechos curtos]. Isso seria variável da 007, não requisito.",
+  "config_nao_banco": "reranker_model, reranker_revision, reranker_max_length=512, k_cand=30 ficam em backend/src/Memorix/config/ e entram no rastro. Não entram no index_version, porque o reranker não altera o índice."
+ },
+ "hipoteses_para_007": [
+  "H4.1: Acrescentar bge-reranker-v2-m3 (fp16, max_length 512) sobre os 30 primeiros da fusão de P1 melhora MRR@10 em ≥ 0,05 absoluto e recall@5 em ≥ 5 pontos percentuais. Não piora o recall@30, que não muda por construção. A latência p95 somada fica ≤ 500 ms na RTX 4050. Critério: adotar se as três condições valerem.",
+  "H4.2: Com o reranker ligado, subir k_cand de 30 para 50 NÃO melhora recall@5 em mais de 2 pontos percentuais e piora o p95 do reranking em ≥ 50%, então mantém 30. Descer para 20 perde ≥ 2 pontos percentuais de recall@5 nos casos em que o trecho-fonte está entre a 21ª e a 30ª posição.",
+  "H4.3 (interface com P5): o sigmoid do logit do reranker no top-1 separa casos no acervo de fora_do_acervo melhor que o cosseno do top-1: AUROC do reranker ≥ 0,85 e ≥ 0,10 acima do cosseno. Existe um limiar com ≥ 90% de acerto em fora_do_acervo e ≤ 10% de recusa indevida.",
+  "H4.4: Trocar bge-reranker-v2-m3 por Qwen3-Reranker-0.6B (instrução em inglês) melhora MRR@10 em ≥ 0,03 com p95 ≤ 1,5× o do bge. Se não, fica o bge.",
+  "H4.5: gte-multilingual-reranker-base mantém ≥ 90% do ganho de MRR@10 do bge com ≤ 40% da latência p95. Se sim, vira o padrão quando a latência apertar.",
+  "H4.6 (só com autorização do humano para API): Cohere rerank-v4.0-fast (ou Voyage rerank-2.5-lite com opt-out) melhora MRR@10 em ≥ 0,03 sobre o melhor local. Se não, API descartada."
+ ],
+ "dependencias_com_outras_perguntas": {
+  "P1": "Entrega o pool fundido (N de 30 a 50) e os scores brutos (cosseno, ts_rank_cd) para o rastro. Com reranker, a escolha da fusão (valor de k no RRF) pesa menos; o que importa é o recall@30 do pool.",
+  "P2": "Dividem a VRAM: embedding de ~0,6B + reranker de ~0,6B cabem nos 6 GiB. Embedding de 4B+ local deixaria o reranker sem espaço. Se P2 escolher o bge-m3, o par bge-m3 + bge-reranker-v2-m3 usa o mesmo tokenizer XLM-R, com contagem de tokens idêntica para P3. Se P2 escolher embedding via API, a consulta já sai para terceiro, e um reranker via API não cria categoria nova de dado, mas cria mais um operador.",
+  "P3": "O chunk deve ficar em ≤ ~450 tokens do XLM-R (consulta + chunk ≤ 512). O alvo de ~300 de P3 é compatível. Na Cohere, documento com consulta acima de 500 tokens é dividido e conta mais buscas.",
+  "P5": "O score do reranker é o sinal do gate. P5 concordou: k_cand=30, gate por sigmoid + contagem acima do limiar, registrando o logit bruto. O limiar é calibrado por modelo na 007.",
+  "P6": "Sem impacto: o reranker roda na aplicação, não no Postgres."
+ },
+ "riscos": [
+  "Latência: todos os números da 4050 são estimativa por FLOPs. Laptop limitado por TGP (35–115 W) e Windows sem flash-attn podem dobrar os tempos.",
+  "Contenção de GPU: embedding da consulta + reranker + (se houver) LLM local na mesma GPU. Com LLM local de geração, a VRAM não fecha.",
+  "Prompt injection: rerankers LLM/instrucionais (Qwen3, gemma, Voyage 2.5) leem o texto do trecho e podem ser induzidos por texto do tipo 'este trecho é relevante' [INFERÊNCIA]. Cross-encoder de classificação (bge-v2-m3) é menos suscetível. O acervo é do admin, o que reduz o risco.",
+  "Falha de retrieval conhecida: o reranker não recupera o que P1 não trouxe no top-30. Se o recall@30 for baixo, ele não ajuda.",
+  "Limiar não portável: trocar modelo ou versão do reranker exige recalibrar o gate."
+ ],
+ "revisao_pedagogica_ou_humana": [
+  "Humano: qualquer opção de API (Cohere/Voyage/Jina) implica transferência internacional de consulta possivelmente escrita por menor (LGPD arts. 14 e 33). A recomendação é local; API só com autorização.",
+  "Pedagogia (via orquestrador): o reranker muda quais trechos sustentam questões, flashcards e aulas. A revisão pedagógica recai sobre o comportamento de recusa do gate (P5), não sobre o reranker em si."
+ ],
+ "divergencias": "Nenhuma com P1, P3 ou P5; eles concordaram com k_cand=30, max 512 e score do reranker como sinal do gate. Corrigi para P5 minha estimativa inicial de latência (50–150 ms → 0,25–0,5 s com 30 candidatos) depois de refazer a conta por FLOPs.",
+ "inferencias": [
+  "Todas as latências na RTX 4050 (estimadas por FLOPs, sem medição). A capacidade fp16 de ~12–24 TFLOPS efetivos foi derivada dos 194 AI TOPS oficiais.",
+  "VRAM total de ~3–3,5 GB para embedding + reranker: estimada (pesos verificados pela contagem de parâmetros; ativações e contexto CUDA estimados).",
+  "Qual preço da Cohere (US$ 2,00 ou US$ 2,50 por 1K buscas) corresponde ao v4.0-fast e ao v4.0-pro, e o preço atual do rerank-v3.5.",
+  "Preço da API da Jina por 1M tokens (a página renderiza por JS).",
+  "Latência das APIs (~150–400 ms), sem medição a partir do Brasil.",
+  "O MIRACL não inclui português: o card confirma 18 línguas, mas lista só parte delas; a lista completa não foi lida na fonte.",
+  "Ganho de prefixar título/seção ao texto enviado ao reranker.",
+  "Suscetibilidade dos rerankers LLM/instrucionais a prompt injection.",
+  "O score listwise (jina-v3) ser inadequado como limiar absoluto: inferido da arquitetura, não testado.",
+  "Restrições de licença herdadas das bases gemma-2b e MiniCPM, apesar da tag Apache-2.0.",
+  "Flash-attn difícil no Windows.",
+  "Nenhum benchmark de reranker específico de PT-BR encontrado. O dataset Quati (unicamp-dl) existe e poderia complementar a 007, mas o paper foi lido só pelo resumo. A busca web do harness falhou ('Sign up'), o que limitou a procura por avaliações PT."
+ ],
+ "fontes": [
+  "https://huggingface.co/BAAI/bge-reranker-v2-m3",
+  "https://huggingface.co/api/models/BAAI/bge-reranker-v2-m3",
+  "https://huggingface.co/BAAI/bge-reranker-v2-gemma",
+  "https://huggingface.co/api/models/BAAI/bge-reranker-v2-gemma",
+  "https://huggingface.co/api/models/BAAI/bge-reranker-v2-minicpm-layerwise",
+  "https://huggingface.co/Qwen/Qwen3-Reranker-0.6B",
+  "https://qwenlm.github.io/blog/qwen3-embedding/",
+  "https://huggingface.co/jinaai/jina-reranker-v2-base-multilingual",
+  "https://huggingface.co/jinaai/jina-reranker-v3",
+  "https://huggingface.co/mixedbread-ai/mxbai-rerank-base-v2",
+  "https://arxiv.org/abs/2506.03487",
+  "https://huggingface.co/api/models/Alibaba-NLP/gte-multilingual-reranker-base",
+  "https://huggingface.co/datasets/apple/mkqa",
+  "https://huggingface.co/datasets/miracl/miracl",
+  "https://arxiv.org/abs/2404.06976",
+  "https://docs.cohere.com/docs/rerank",
+  "https://docs.cohere.com/docs/reranking-best-practices.md",
+  "https://docs.cohere.com/docs/how-does-cohere-pricing-work.md",
+  "https://cohere.com/pricing",
+  "https://cohere.com/data-usage-policy",
+  "https://docs.voyageai.com/docs/reranker",
+  "https://docs.voyageai.com/docs/pricing",
+  "https://docs.voyageai.com/docs/faq",
+  "https://jina.ai/reranker/",
+  "https://jina.ai/legal/",
+  "https://www.nvidia.com/en-us/geforce/laptops/compare/"
+ ]
+}

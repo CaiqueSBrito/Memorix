@@ -1,0 +1,282 @@
+{
+ "pergunta": "P3 — Chunking de material didático PT-BR (PDF e texto): tamanho, sobreposição, corte por estrutura, se parent/child vale a pena, e um chunking provisório para a tarefa 004. Fora do escopo: o extrator de PDF (005) e o modelo (P2).",
+ "opcoes": [
+  {
+   "nome": "A. Tamanho fixo por tokens com overlap (256/512 tokens, overlap de 10–20%)",
+   "descricao": "Janela deslizante de N tokens com sobreposição, sem olhar a estrutura. É o padrão de muitos frameworks. O OpenAI file search usa 800/400 por padrão.",
+   "qualidade_ptbr": "Não há estudo PT-BR isolado. Nos estudos em inglês é um baseline competitivo. Chroma (text-embedding-3-large, k=5): TokenText 400/0 teve recall 89,2 e 800/400 teve 87,9. Recursivo 400/0 teve 89,5; ou seja, o fixo nunca ganha do recursivo com chunk ≤400 sem overlap. No estudo em português europeu (2604.04948, Docling, K=200), o recursivo 'cego' ficou em 84,7% e o hierárquico com breadcrumb em 91,2%. Corta frases e listas no meio, o que é ruim para gerar questões e flashcards a partir de uma ideia completa.",
+   "latencia": "Ingestão: ms por documento (tokenizar e fatiar) [INFERÊNCIA]. Consulta: nenhum custo.",
+   "recursos": "Só CPU, RAM desprezível.",
+   "licenca": "Código próprio. O tokenizer vem de transformers/tokenizers (Apache 2.0).",
+   "custo": "US$ 0 (local).",
+   "lgpd": "Sem envio a terceiros.",
+   "compat_pgvector_supabase": "Total. Os offsets se sobrepõem entre chunks, o que o schema 0001 aceita (só exige UNIQUE(doc_id, position) e offset_end > offset_start). A avaliação por offsets conta tokens duplicados (IoU cai).",
+   "fontes": [
+    "https://research.trychroma.com/evaluating-chunking",
+    "https://developer.nvidia.com/blog/finding-the-best-chunking-strategy-for-accurate-ai-responses/",
+    "https://arxiv.org/abs/2604.04948"
+   ]
+  },
+  {
+   "nome": "B. Recursivo por estrutura (títulos → parágrafos → linhas/listas → sentenças → ; : → espaço), com teto de tokens — RECOMENDADO",
+   "descricao": "Títulos são limites rígidos: nenhum chunk atravessa seção. Dentro da seção, o texto é dividido pelo maior separador disponível até caber no teto. Depois, pedaços vizinhos da mesma seção são reagrupados de forma gulosa. Cada chunk é um recorte exato do texto canônico.",
+   "qualidade_ptbr": "Melhor evidência disponível. (1) Português europeu, 36 PDFs administrativos: hierarchical recursive + breadcrumb deu 91,2% contra 84,7% do recursivo simples, com o mesmo extrator (Docling, K=200). A diferença chega a 33 p.p. em perguntas sobre tabelas. Os autores concluem que 'hierarchy-aware chunking contributed more to accuracy than the conversion framework'. (2) Chroma: o recursivo com separadores de sentença, 200–400 tokens e sem overlap, é 'consistently high performing'; o 400/0 teve recall 89,5 e o 200/0 teve IoU 6,9, o dobro do 400. (3) NVIDIA: consultas factuais funcionam melhor com 256–512 tokens; os extremos (128 e 2048) pioram. Preserva a unidade de ideia (parágrafo, lista com a frase que a introduz), que é o que a geração de questões e flashcards precisa.",
+   "latencia": "Ingestão: uma tokenização por documento com offset_mapping mais cortes por regex: ms a dezenas de ms por documento [INFERÊNCIA]. Consulta: nenhum custo.",
+   "recursos": "Só CPU. O tokenizer do bge-m3 (XLM-R SentencePiece) usa poucos MB de RAM [INFERÊNCIA].",
+   "licenca": "Código próprio. transformers é Apache 2.0 (METADATA do pacote instalado 5.17.0).",
+   "custo": "US$ 0 (local).",
+   "lgpd": "Sem envio a terceiros.",
+   "compat_pgvector_supabase": "Total, sem mudar a 0001: text, offset_start/offset_end e position já bastam. Para a 0002, nenhuma coluna exigida pelo chunking. A coluna tsvector de P1 é gerada de chunks.text.",
+   "fontes": [
+    "https://arxiv.org/abs/2604.04948",
+    "https://research.trychroma.com/evaluating-chunking",
+    "https://github.com/brandonstarxel/chunking_evaluation",
+    "https://developer.nvidia.com/blog/finding-the-best-chunking-strategy-for-accurate-ai-responses/"
+   ]
+  },
+  {
+   "nome": "C. Semântico (breakpoint por distância de embedding entre sentenças, Kamradt; ou ClusterSemanticChunker)",
+   "descricao": "Gera o embedding de cada sentença e corta onde há descontinuidade semântica. A variante de cluster maximiza a similaridade dentro do chunk, respeitando um tamanho máximo.",
+   "qualidade_ptbr": "Sem evidência em PT. Em inglês os ganhos são inconsistentes. O estudo da Vectara (2410.13070) conclui que o custo 'not justified by consistent performance gains'; em documentos reais o tamanho fixo muitas vezes vence. Chroma: o Kamradt padrão teve recall 83,6, abaixo do recursivo 400/0 (89,5). O Cluster 400 teve 91,3 com o 3-large, mas perdeu para o fixo com o MiniLM. O resultado depende do modelo de embedding, o que acopla o chunking à escolha de P2.",
+   "latencia": "Ingestão: um embedding por sentença, algo como 10–30× mais forward passes que o chunking estrutural. Na 4050 são minutos para 10 mil chunks [INFERÊNCIA]. Consulta: nenhum custo.",
+   "recursos": "GPU com o próprio modelo de embedding (VRAM de P2).",
+   "licenca": "Código próprio ou LangChain/Chroma (MIT/Apache) [INFERÊNCIA].",
+   "custo": "US$ 0 local. Se o embedding for via API, paga-se o embedding de cada sentença.",
+   "lgpd": "Local: sem envio. Via API: o acervo (material do admin, não do aluno) iria a terceiros, o que é decisão do humano.",
+   "compat_pgvector_supabase": "Total, sem colunas novas. Os chunks mudam se o modelo mudar, então a reingestão fica acoplada a P2.",
+   "fontes": [
+    "https://arxiv.org/abs/2410.13070",
+    "https://research.trychroma.com/evaluating-chunking"
+   ]
+  },
+  {
+   "nome": "D. Parent/child (small-to-big): busca no filho pequeno, entrega o pai (seção, janela de vizinhos ou hierarquia 2048/512/128)",
+   "descricao": "Variantes: (D1) janela de vizinhos, que entrega o chunk ±w pela coluna position; (D2) pai = seção, que entrega todos os chunks da seção do filho; (D3) HierarchicalNodeParser/AutoMerging da LlamaIndex, com níveis de 2048/512/128 e fusão quando muitos filhos do mesmo pai são recuperados; (D4) sentence window, que busca uma sentença e expande.",
+   "qualidade_ptbr": "Evidência fraca ou negativa. PT-BR (Chronicles of RAG, 2401.07883, livro em PT-BR): sentence window 'inferior to the naive strategy'. LlamaIndex, no próprio notebook oficial: AutoMerging teve correctness 4,27 contra 4,21 do base e pairwise 0,525 ('roughly the same'). O small-to-big não muda o retrieval; muda só o contexto entregue ao gerador. Pode ajudar na geração de aulas, que precisa de uma seção inteira [INFERÊNCIA].",
+   "latencia": "Consulta: +1 SELECT indexado por (doc_id, position) ou (doc_id, section_no), abaixo de 5 ms [INFERÊNCIA]. Aumenta os tokens de entrada do LLM de 2 a 3×, com custo e latência proporcionais na geração.",
+   "recursos": "Desprezível no banco. Mais tokens de contexto no LLM gerador.",
+   "licenca": "Código próprio.",
+   "custo": "US$ 0 no retrieval. A geração paga pelos tokens extras de contexto (depende do provider do LLM).",
+   "lgpd": "Neutro.",
+   "compat_pgvector_supabase": "D1 não precisa de coluna: usa o índice UNIQUE(doc_id, position) da 0001. D2 exige na 0002 `chunks.section_no integer NOT NULL` e o índice (doc_id, section_no); `parent_position` (position do primeiro chunk da seção) é equivalente. D3 exige tabela ou coluna de pai com vários níveis e embeddings por nível: não recomendado.",
+   "fontes": [
+    "https://arxiv.org/abs/2401.07883",
+    "https://developers.llamaindex.ai/python/framework/integrations/retrievers/auto_merging_retriever/"
+   ]
+  },
+  {
+   "nome": "E. Late chunking (Jina)",
+   "descricao": "Passa o documento inteiro (até 8k tokens) pelo transformer e aplica mean pooling nos spans de cada chunk. O chunk ganha o contexto do documento sem LLM.",
+   "qualidade_ptbr": "Sem evidência em PT. Em inglês (BEIR), o paper mostra que late é 'almost always' melhor que naive com chunks pequenos, mas 'naive works better when using large chunks' em parte dos testes. Pré-requisito: modelo de contexto longo com mean pooling. O bge-m3 usa pooling CLS (1_Pooling/config.json: pooling_mode_cls_token=true), então o late chunking fica fora da distribuição de treino. O multilingual-e5 aceita só 512 tokens (tokenizer_config model_max_length=512), o que torna o late chunking inútil. Na prática não se aplica aos candidatos prováveis de P2.",
+   "latencia": "Ingestão: um forward de até 8k tokens por macro-bloco, custo quadrático em atenção. Na 4050 fp16, segundos por documento [INFERÊNCIA].",
+   "recursos": "VRAM: modelo mais ativações de 8k tokens. Com ~570M parâmetros em fp16, algo como 2–4 GB [INFERÊNCIA].",
+   "licenca": "Depende do modelo. Por exemplo, jina-embeddings-v3 é CC BY-NC [INFERÊNCIA — confirmar com P2].",
+   "custo": "US$ 0 local.",
+   "lgpd": "Local: sem envio.",
+   "compat_pgvector_supabase": "Nenhuma coluna nova: continua um vetor por chunk. O vetor depende do documento inteiro, o que já é o regime de reingestão da 004.",
+   "fontes": [
+    "https://arxiv.org/abs/2409.04701",
+    "https://github.com/jina-ai/late-chunking",
+    "https://huggingface.co/BAAI/bge-m3/raw/main/1_Pooling/config.json",
+    "https://huggingface.co/intfloat/multilingual-e5-large/raw/main/tokenizer_config.json"
+   ]
+  },
+  {
+   "nome": "F. Contextual retrieval (Anthropic): um LLM escreve 50–100 tokens de contexto por chunk, prefixados no embedding e no índice lexical",
+   "descricao": "Para cada chunk, o LLM recebe o documento inteiro (com prompt caching) e o chunk, e devolve um contexto curto. O embedding e o BM25/tsvector são calculados sobre contexto + chunk. O texto citável continua sendo só chunks.text.",
+   "qualidade_ptbr": "Sem evidência em PT. Em inglês (Anthropic, recall@20, média de vários domínios): falha de retrieval 5,7% → 3,7% (−35%) só com embeddings; 2,9% (−49%) somando BM25; 1,9% (−67%) com reranker. A própria Anthropic avisa que 'adding generic document summaries' deu 'very limited gains'. Riscos: o contexto gerado pode alucinar e desviar o retrieval, e o conteúdo do documento vira entrada de LLM (prompt injection no material).",
+   "latencia": "Ingestão via API: 1 chamada por chunk; 10 mil chunks levam horas sem batch, menos com concorrência [INFERÊNCIA]. Consulta: nenhum custo extra.",
+   "recursos": "API: nenhum recurso local. Alternativa local: LLM instruct de 3–8B quantizado em 4 bits na 4050 (~3–5 GB de VRAM), ~5–10 h para 10 mil chunks × 100 tokens de saída [INFERÊNCIA].",
+   "licenca": "API: termos comerciais da Anthropic. Local: depende do LLM (ex.: família Qwen, Apache 2.0) [INFERÊNCIA].",
+   "custo": "Anthropic informa US$ 1,02 por 1M de tokens de documento (Claude 3 Haiku, 2024, chunks de 800 tokens). Recalculado com o preço atual do Claude Haiku 4.5 (US$ 1 de entrada, US$ 1,25 de escrita em cache de 5 min, US$ 0,10 de leitura em cache, US$ 5 de saída por MTok), com documentos de ~8k tokens e chunks de ~300: ≈ US$ 0,0017 por chunk + US$ 0,01 por documento, ou seja, ≈ US$ 20 únicos para 10 mil chunks (≈ US$ 7 por 1M de tokens de documento). O Batch API dá −50% [estimativa, INFERÊNCIA; tokens contados no tokenizer da Claude, não no XLM-R]. Toda reingestão paga de novo.",
+   "lgpd": "Envia o acervo inteiro (material do admin) a terceiros. Não há dado de aluno na ingestão, mas continua sendo decisão do humano, e os direitos autorais do material também pesam. A alternativa local elimina o envio.",
+   "compat_pgvector_supabase": "Exige na 0002 `chunks.context text NULL`, para que o tsvector gerado e a regeneração de embeddings reproduzam a mesma entrada e para auditoria. O modelo e o prompt_version do contexto vão no rastro de ingestão. Os offsets ficam inalterados (o contexto não entra em chunks.text).",
+   "fontes": [
+    "https://www.anthropic.com/engineering/contextual-retrieval",
+    "https://platform.claude.com/docs/en/about-claude/pricing"
+   ]
+  },
+  {
+   "nome": "G. Cabeçalho contextual determinístico (breadcrumb 'Título do doc > Seção > Subseção' prefixado só na entrada do embedding e do tsvector)",
+   "descricao": "É a versão gratuita de F: o caminho de títulos que o chunker já calcula é prefixado no texto de embedding. chunks.text e os offsets não mudam.",
+   "qualidade_ptbr": "Evidência direta em PT (2604.04948): 'metadata enrichment (section paths...)' + hierarchical splitting deu +6,5 p.p. (84,7 → 91,2). Os dois efeitos estão confundidos no estudo, e a avaliação foi feita por LLM-as-judge com K=200.",
+   "latencia": "Nenhuma relevante.",
+   "recursos": "Nenhum.",
+   "licenca": "Código próprio.",
+   "custo": "US$ 0.",
+   "lgpd": "Neutro.",
+   "compat_pgvector_supabase": "Se entrar, a 0002 recebe `chunks.heading_path text NULL`, usada pelo tsvector gerado de P1: to_tsvector(cfg, coalesce(heading_path,'') || ' ' || text).",
+   "fontes": [
+    "https://arxiv.org/abs/2604.04948"
+   ]
+  },
+  {
+   "nome": "H. Proposições (Dense X) e chunk por página (NVIDIA) — descartadas",
+   "descricao": "Proposições: um LLM reescreve o texto em fatos atômicos. Página: um chunk por página do PDF.",
+   "qualidade_ptbr": "Proposições: melhor retrieval em inglês (Dense X), mas o texto reescrito deixa de ser um recorte exato do documento. Isso quebra offset_start/offset_end e a regra de citar só o acervo. Página: foi a melhor média no estudo da NVIDIA (0,648), mas em apostilas corta frases e listas no meio, e páginas densas passam de 512 tokens (limite do e5 e do reranker de P4) [INFERÊNCIA].",
+   "latencia": "Proposições: um LLM por parágrafo. Página: nenhum custo.",
+   "recursos": "Proposições: LLM. Página: nenhum.",
+   "licenca": "—",
+   "custo": "Proposições: custo de LLM parecido com F.",
+   "lgpd": "Proposições via API: envio a terceiros.",
+   "compat_pgvector_supabase": "Proposições são incompatíveis com a exigência de offsets no texto do documento. Página exigiria o número da página, que está fora da 0001.",
+   "fontes": [
+    "https://arxiv.org/abs/2312.06648",
+    "https://developer.nvidia.com/blog/finding-the-best-chunking-strategy-for-accurate-ai-responses/"
+   ]
+  }
+ ],
+ "recomendacao": {
+  "escolha": "B — recursivo por estrutura ('estrutural-v1'), local e sem LLM: teto de 400 tokens do tokenizer do bge-m3, mínimo de 80, sem overlap, títulos como limite rígido. Sem parent/child e sem contexto gerado por LLM no provisório: G, D1 e F viram hipóteses da 007. Não há opção via API na recomendação, então não se aplica uma 'alternativa local'. Se o humano quiser F, a alternativa local é um LLM de 3–8B quantizado na 4050.",
+  "justificativa": [
+   "Único método com evidência em português: hierárquico + caminho de seções, +6,5 p.p. (2604.04948). Nos estudos em inglês, recursivo 200–400 sem overlap é consistentemente bom (Chroma).",
+   "Teto de 400 tokens cabe em todos os candidatos de P2 (e5/Serafim = 512) e no reranker de P4 (512 = consulta + chunk; P4 pediu ≤ ~450). Fica na faixa de 256–512 que a NVIDIA achou boa para consultas factuais, que são o perfil das questões MC/V-F e dos flashcards. A média resultante fica em ~250–300 tokens (Chroma: recursivo 400 → média 276–312) [INFERÊNCIA para PT/XLM-R].",
+   "Sem overlap: com o 3-large, o overlap não ajudou o recall (Recursivo 400/0 = 89,5 contra 400/200 = 88,1) e reduziu o IoU. Cada caractere pertence a um único chunk, então o acerto por offsets na 007 fica sem ambiguidade, a deduplicação no contexto é trivial e o texto canônico pode ser reconstruído a partir dos chunks (a 0001 não guarda o texto integral). O overlap vira hipótese: com o MiniLM ele ajudou (250/125 = 82,4 contra 250/0 = 77,1).",
+   "Semântico, late chunking e parent/child não mostraram ganho consistente (Vectara; notebook da LlamaIndex; sentence window pior em PT-BR). O late chunking nem se aplica a bge-m3 (CLS) ou e5 (512).",
+   "Revisão da minha posição inicial no hub (overlap de 10–15%): troquei para 0 depois de ler as tabelas da Chroma."
+  ],
+  "chunking_provisorio_004": {
+   "nome_versao": "estrutural-v1 (vai no rastro de chunking: estratégia + parâmetros)",
+   "entrada": "`texto_canonico`: saída da 005 (extração + normalização), com NFC, quebras de linha `\\n`, sem `\\x00` (o Postgres não guarda NUL em text), sem hifenização de fim de linha e sem cabeçalho/rodapé repetido. Títulos em Markdown `#` quando o extrator conseguir. O chunker nunca altera esse texto.",
+   "tokenizer": "Tokenizer rápido de `BAAI/bge-m3` (XLMRobertaTokenizer, model_max_length 8192, o mesmo vocabulário do multilingual-e5, cujo model_max_length é 512). Contagem sem tokens especiais (`add_special_tokens=False`, sem truncation). O documento inteiro é tokenizado uma vez com `return_offsets_mapping=True`, disponível só em tokenizer fast. `n_tokens(s,e) = bisect_left(starts,e) - bisect_left(starts,s)`. O teto final é conferido retokenizando cada chunk. Se P2 escolher um modelo com outro tokenizer (ex.: Qwen), troca-se só o nome do tokenizer; os parâmetros são revistos na 007.",
+   "parametros": {
+    "max_tokens": 400,
+    "min_tokens": 80,
+    "overlap_tokens": 0,
+    "limite_rigido": "linhas de título: `^#{1,6} ` ou numeração `^\\d+(\\.\\d+)*\\.?\\s+` em linha curta (≤80 caracteres) sem pontuação final",
+    "separadores_em_ordem": [
+     "linha em branco (\\n\\s*\\n)",
+     "\\n (mantém itens de lista e linhas de tabela como unidades)",
+     "fim de sentença (?<=[.!?…])\\s+, ignorando abreviações PT (Sr., Sra., Dr., Prof., p., pp., pág., art., fig., ex., cap., vol., n., nº, séc., cf., et al.), inicial de uma letra e número seguido de ponto",
+     "; e :",
+     "espaço",
+     "corte por caracteres (último recurso)"
+    ]
+   },
+   "algoritmo": [
+    "1. Seções: divide o texto nos inícios das linhas de título. O título fica no começo da própria seção.",
+    "2. Em cada seção, se n_tokens > max, divide recursivamente pelo primeiro separador presente; pedaços ainda > max descem para o separador seguinte.",
+    "3. Empacotamento guloso dentro da seção: junta pedaços adjacentes enquanto n_tokens(início do primeiro, fim do último) ≤ max, contando o span real, com separadores incluídos.",
+    "4. Se o último chunk da seção ficar < min_tokens e couber no anterior, eles são fundidos. Nunca se funde entre seções.",
+    "5. Recorte: avança s e recua e sobre espaços. Descarta spans sem nenhum caractere alfanumérico (restos de numeração de página).",
+    "6. Um chunk que é só título é fundido ao chunk seguinte (o início deste recua), se couber no teto.",
+    "7. position = 0..n−1 na ordem do documento; chunk_id = f\"{doc_id}:{position}\"; text = texto_canonico[s:e]; offset_start = s; offset_end = e.",
+    "8. Tabela maior que o teto: corta entre linhas (separador \\n) sem repetir o cabeçalho, para manter text como recorte exato. Ponytail: sem repetir o cabeçalho, as linhas finais perdem o nome das colunas; a 007 pode testar G (breadcrumb) como mitigação."
+   ],
+   "offsets": "Índices de str do Python, ou seja, code points, sobre o texto canônico NFC, em intervalo meio-aberto [s,e). No Postgres o equivalente é `substring(t from offset_start+1 for offset_end-offset_start)` (1-based, em caracteres). No frontend em JS (UTF-16) é preciso converter antes de destacar trecho [INFERÊNCIA]. Como a 0001 não guarda o texto integral, o rastro de ingestão deve registrar extrator, versão e `text_sha256` do texto canônico. Assim a mudança de extrator com o mesmo doc_sha256 é detectável.",
+   "invariantes_para_o_teste_primeiro_da_004": [
+    "text == texto_canonico[offset_start:offset_end]",
+    "offset_end > offset_start",
+    "spans ordenados e disjuntos: offset_start[i] ≥ offset_end[i−1]",
+    "n_tokens(chunk) ≤ 400 retokenizando o chunk",
+    "todo caractere que não é espaço pertence a exatamente um chunk, exceto spans descartados por não terem alfanumérico",
+    "nenhum chunk atravessa uma linha de título (exceto o título colado ao próprio conteúdo)",
+    "nenhum chunk termina em abreviação ('Sr.', 'p.', 'art.')",
+    "chunk_id == f'{doc_id}:{position}' com position contíguo a partir de 0",
+    "mesmo texto + mesmos parâmetros → mesmos spans (determinismo)"
+   ],
+   "rastro": "Um registro JSONL por documento, conforme rag-rastreabilidade: trace_id, etapa=chunking, doc_id, doc_sha256, estrategia='estrutural-v1', parametros {tokenizer, max_tokens, min_tokens, overlap}, lista de (chunk_id, offset_start, offset_end, n_tokens). Sem texto no log.",
+   "prova_de_viabilidade": "Protótipo descartável em memória (sem arquivo, com um contador de tokens por regex no lugar do XLM-R) sobre um texto PT com títulos, lista numerada e parágrafo longo com 'Sr.'. As invariantes de recorte exato, ordenação disjunta, teto, cobertura e ausência de corte em 'Sr.' passaram. A primeira versão cortava depois de 'Sr.'; a lista de abreviações corrigiu. Não foi medido com o tokenizer real (download proibido nesta tarefa)."
+  }
+ },
+ "impacto_schema_0002": {
+  "migracao_0001": "Não muda. chunk_id textual, position, UNIQUE(doc_id, position), offset_start/offset_end NOT NULL com CHECK e text bastam para a opção B e para o parent/child por vizinhos (D1).",
+  "recomendado_B": "Nenhuma coluna ou índice novo por causa do chunking. O tsvector de P1 é gerado de chunks.text. Contagem de tokens não vira coluna: recalcula-se com o tokenizer quando preciso.",
+  "condicional_parent_child": "Parent/child exige coluna só na variante pai = seção (D2), e só se ganhar na 007: `chunks.section_no integer NOT NULL` (ordinal da seção no documento) + `CREATE INDEX ON chunks (doc_id, section_no)`. O texto do pai é string_agg(text ORDER BY position), sem FK. `parent_position` (position do primeiro chunk da seção) é equivalente; section_no é mais simples porque o pai é um intervalo de chunks, não um chunk. A janela de vizinhos (D1) não precisa de coluna. A hierarquia multinível (D3) não é recomendada.",
+  "condicional_cabecalho_G": "`chunks.heading_path text NULL`, se H4 ganhar. O tsvector gerado passa a ser to_tsvector(cfg, coalesce(heading_path,'') || ' ' || text) (interface com P1/P6).",
+  "condicional_contextual_F": "`chunks.context text NULL`, se o humano aprovar a opção F e H5 ganhar. Os offsets e o text não mudam; o modelo e o prompt_version vão no rastro.",
+  "late_chunking_E": "Nenhuma coluna. Não se aplica aos candidatos prováveis de P2."
+ },
+ "hipoteses_para_007": [
+  {
+   "id": "H-P3-1 (tamanho)",
+   "hipotese": "Reduzir max_tokens de 400 para 256 (mínimo de 50) melhora MRR@10 em ≥0,03 sem baixar o recall@5 em mais de 0,02 e sem baixar o recall com orçamento fixo de contexto (~1500 tokens entregues).",
+   "metrica": "MRR@10, recall@5, recall com orçamento fixo e IoU por tokens (Chroma)."
+  },
+  {
+   "id": "H-P3-2 (overlap)",
+   "hipotese": "Passar o overlap de 0 para ~15% (~60 tokens, alinhado a sentença) aumenta o recall@5 em ≥0,03 sem piorar o IoU por tokens em mais de 20% relativo e sem aumentar o p95 de consulta.",
+   "metrica": "recall@5, IoU e p95."
+  },
+  {
+   "id": "H-P3-3 (vizinhos, D1)",
+   "hipotese": "Entregar ao gerador o chunk ±1 vizinho da mesma seção aumenta a cobertura do intervalo esperado dentro do contexto (≥80% dos caracteres) em ≥0,05, sem piorar a fidelidade da geração e com no máximo 2× os tokens de entrada.",
+   "metrica": "Cobertura por offsets no contexto e faithfulness (checagem determinística de chunk_id + revisão humana; LLM-as-judge nunca como evidência única)."
+  },
+  {
+   "id": "H-P3-4 (breadcrumb, G)",
+   "hipotese": "Prefixar 'Título > Seção' na entrada do embedding (e do tsvector) aumenta o recall@5 em ≥0,03 sem piorar o MRR@10 nem o comportamento fora do acervo (taxa de falso 'está no acervo').",
+   "metrica": "recall@5, MRR@10 e taxa de falso positivo fora do acervo."
+  },
+  {
+   "id": "H-P3-5 (contextual via LLM, F — só com decisão do humano sobre API, ou usando LLM local)",
+   "hipotese": "Adicionar contexto gerado por LLM reduz 1−recall@20 em ≥30% relativo (a Anthropic mediu 35%) sem piorar o fora do acervo, a um custo único ≤ US$ 25 para 10 mil chunks.",
+   "metrica": "1−recall@20, recall@5, fora do acervo e custo por ingestão."
+  },
+  {
+   "id": "H-P3-6 (seção como pai, D2 — só se H-P3-3 ganhar)",
+   "hipotese": "Entregar a seção inteira em vez dos vizinhos ±1 melhora a cobertura do contexto em ≥0,05 para pedidos de 'aula' sem estourar o orçamento de tokens do gerador.",
+   "metrica": "Cobertura por offsets e tokens de entrada."
+  }
+ ],
+ "notas_para_protocolo_007": [
+  "Comparar chunkings com o mesmo orçamento de tokens de contexto, não só por recall@k: chunks maiores 'acertam' o intervalo esperado com mais facilidade (combinado com P5 no hub).",
+  "Definição de acerto independente do chunking: a união dos spans recuperados cobre ≥X% (proposta: 80%) do intervalo esperado (doc_sha256 + offsets). Reportar também o IoU por tokens (Chroma).",
+  "O caso de avaliação (006) deve guardar também o texto do trecho esperado (ou o hash dele). Se a 005 mudar o extrator, os offsets do mesmo doc_sha256 deixam de valer em silêncio.",
+  "Com ~20 casos, 0,03 corresponde a 1 caso, ou seja, é ruído. Os limiares acima pressupõem ≥40 casos, ou pedem teste pareado (ex.: McNemar) [INFERÊNCIA]; a consolidação decide."
+ ],
+ "dependencias_com_outras_perguntas": [
+  "P2: define o tokenizer da contagem (o XLM-R cobre bge-m3 e e5; Qwen3 exigiria rever). Teto de 400 fixado para caber no mínimo de 512. O late chunking só volta à mesa se P2 escolher um modelo de contexto longo com mean pooling.",
+  "P1: tsvector gerado de chunks.text, com o mesmo texto do denso. Se H-P3-4 ou H-P3-5 ganharem, o tsvector passa a incluir heading_path/context. Chunks de tamanho homogêneo deixam o ts_rank comparável.",
+  "P4: o reranker com max_length 512 é atendido (chunk ≤400 + consulta). O pool de candidatos não depende do chunking.",
+  "P5: com chunks de ~300 tokens, k=5 dá ~1,5k tokens de contexto. Avaliação por offsets independe do chunking. A expansão por vizinhos (H-P3-3) muda o contexto, não os scores do gate.",
+  "P6: nada específico; atenção ao NUL (\\x00), que o Postgres não aceita em text.",
+  "005 (extrator): entrega o texto canônico com títulos em Markdown, sem hifenização de quebra, sem cabeçalho/rodapé repetido, com NFC e sem \\x00. A qualidade do chunking estrutural depende disso (2604.04948: a qualidade da preparação domina).",
+  "006/004: formato do caso com texto esperado; teste-primeiro da 004 com as invariantes listadas."
+ ],
+ "pontos_para_revisao_pedagogica_ou_humana": [
+  "Pedagogia (via orquestrador): se o chunk de ~250–300 tokens ('um parágrafo ou lista com a frase de abertura') é a unidade certa para sustentar uma questão ou flashcard, e se o tipo 'aula' deve receber a seção inteira (H-P3-6).",
+  "Humano: a opção F (contextual via API) envia o acervo inteiro a terceiros, com implicações de direito autoral e de LGPD. Só deve ser testada com decisão explícita; existe a alternativa local."
+ ],
+ "riscos": [
+  "Extrator ruim (títulos não detectados) degrada B para recursivo 'cego'; o ganho de +6,5 p.p. depende da hierarquia.",
+  "O detector de título por regex em fonte 'texto' pode gerar falsos títulos (linhas curtas numeradas). Ponytail: a heurística tem teto conhecido; trocar por um sinal estrutural do extrator (005) quando houver.",
+  "Tabelas grandes cortadas sem cabeçalho perdem contexto.",
+  "Offsets em code points divergem de UTF-16 no frontend.",
+  "Sem métrica nesta tarefa: tudo acima está 'não medido' até a 007."
+ ],
+ "inferencias": [
+  "Nenhum estudo publicado mede chunking em PT-BR didático. As evidências em português são administrativo (PT-PT, 2604.04948) e ficção (PT-BR, 2401.07883). A transposição para apostilas é inferência.",
+  "Média de ~250–300 tokens XLM-R com teto de 400 (a Chroma mediu com cl100k, em inglês).",
+  "Latências de ingestão (ms por documento), VRAM do late chunking e do LLM local, e tempo de 5–10 h do contextual local não foram medidos.",
+  "Custo do contextual com Haiku 4.5 (~US$ 20 para 10 mil chunks) é estimativa com documentos de 8k tokens e contagem no tokenizer da Claude, que difere do XLM-R.",
+  "Licença do tokenizers não conferida no METADATA (transformers = Apache 2.0 conferida). Licença do jina-v3 e das famílias de LLM local não conferidas.",
+  "Tipo de pooling de gte-multilingual e Qwen3-Embedding não conferido (afeta só a opção E).",
+  "Lista de abreviações PT e heurística de título são escolhas próprias, sem benchmark.",
+  "Limiar de ≥40 casos e o teste pareado são sugestão estatística não validada."
+ ],
+ "fontes": [
+  "https://research.trychroma.com/evaluating-chunking",
+  "https://github.com/brandonstarxel/chunking_evaluation",
+  "https://developer.nvidia.com/blog/finding-the-best-chunking-strategy-for-accurate-ai-responses/",
+  "https://www.llamaindex.ai/blog/evaluating-the-ideal-chunk-size-for-a-rag-system-using-llamaindex-6207e5d3fec5",
+  "https://developers.llamaindex.ai/python/framework/integrations/retrievers/auto_merging_retriever/",
+  "https://arxiv.org/abs/2410.13070",
+  "https://arxiv.org/abs/2505.21700",
+  "https://arxiv.org/abs/2409.04701",
+  "https://github.com/jina-ai/late-chunking",
+  "https://arxiv.org/abs/2312.06648",
+  "https://www.anthropic.com/engineering/contextual-retrieval",
+  "https://platform.claude.com/docs/en/about-claude/pricing",
+  "https://arxiv.org/abs/2604.04948",
+  "https://doi.org/10.3390/app16105069",
+  "https://arxiv.org/abs/2401.07883",
+  "https://huggingface.co/BAAI/bge-m3/raw/main/tokenizer_config.json",
+  "https://huggingface.co/BAAI/bge-m3/raw/main/1_Pooling/config.json",
+  "https://huggingface.co/intfloat/multilingual-e5-large/raw/main/tokenizer_config.json",
+  "https://www.postgresql.org/docs/current/datatype-character.html",
+  "https://huggingface.co/docs/transformers/main_classes/tokenizer",
+  "venv/Lib/site-packages/transformers/tokenization_utils_base.py (return_offsets_mapping: só tokenizer fast; transformers 5.17.0, Apache 2.0)"
+ ],
+ "divergencias": "Nenhuma com os outros pesquisadores. P4 pediu chunk ≤ ~450 tokens (atendido com 400). P2 pediu contagem no tokenizer do baseline (atendido: XLM-R do bge-m3). P5 concordou em avaliar por offsets; acrescentei o orçamento fixo de contexto. Minha opinião inicial no hub (overlap de 10–15%) foi revista para 0 com base nas tabelas da Chroma."
+}
