@@ -1,7 +1,7 @@
 """Engine e sessão do Postgres (Supabase, Supavisor em modo session).
 
-A URL é montada só a partir das variáveis do `.env` lidas por `ConfigDB`
-(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE). Nunca registre `DATABASE_URL`.
+A URL usa as variáveis do arquivo selecionado por `MEMORIX_ENV_FILE` (ou `.env`).
+`DB_SSLMODE` mantém TLS obrigatório por padrão. Nunca registre `DATABASE_URL`.
 """
 
 from sqlalchemy import URL, create_engine
@@ -20,7 +20,7 @@ DATABASE_URL = URL.create(
     host=ConfigDB.DB_HOST,
     port=int(ConfigDB.DB_PORT),
     database=ConfigDB.DB_NAME,
-    query={"sslmode": "require"},
+    query={"sslmode": ConfigDB.DB_SSLMODE},
 )
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
