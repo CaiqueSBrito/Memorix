@@ -26,6 +26,22 @@ def test_trace_lookup_and_stage_metrics(tmp_path, monkeypatch):
                                    "tokens_entrada": 11, "tokens_saida": 7, "custo_estimado": 0.03}
 
 
+def test_batch_duplicate_model_usage_is_aggregated_separately(trace_file):
+    record_trace("batch-one", "deduplicacao", status="ok", duracao_ms=12,
+                 tokens_entrada=11, tokens_saida=3, custo_estimado=0)
+    record_trace("batch-two", "deduplicacao", status="ok", duracao_ms=18,
+                 tokens_entrada=17, tokens_saida=4, custo_estimado=0)
+    record_trace("batch-error", "deduplicacao", status="erro", duracao_ms=50, erro="ValueError")
+    record_trace("generation", "geracao", status="ok", duracao_ms=20,
+                 tokens_entrada=100, tokens_saida=30, custo_estimado=0)
+    metrics = summarize_traces()
+    assert metrics["deduplicacao"] == {
+        "total": 3, "erros": 1, "taxa_erro": 1 / 3, "p95_ms": 50,
+        "tokens_entrada": 28, "tokens_saida": 7, "custo_estimado": 0,
+    }
+    assert metrics["geracao"]["tokens_entrada"] == 100
+
+
 def test_failed_chunking_traces_both_stages(tmp_path, monkeypatch):
     from backend.src.Memorix.ingestion import ingest
 

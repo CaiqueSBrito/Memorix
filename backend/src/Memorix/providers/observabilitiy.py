@@ -1,13 +1,21 @@
 """Rastro append-only; o caminho é resolvido em cada chamada."""
 
+import hmac
 import json
 import logging
 import os
 from datetime import datetime, timezone
+from hashlib import sha256
 from math import ceil
 from pathlib import Path
 
 from ..config.config import ConfigIngestao
+
+_QUERY_KEY = os.urandom(32)  # Ephemeral: trace_id correlates stages; hashes resist a topic dictionary.
+
+
+def query_digest(value: str) -> str:
+    return hmac.new(_QUERY_KEY, value.encode("utf-8"), sha256).hexdigest()
 
 
 def _trace_file() -> Path:
@@ -48,7 +56,7 @@ def summarize_traces() -> dict[str, dict]:
         summary = stages.setdefault(stage, {"durations": [], "erros": 0})
         summary["durations"].append(entry["duracao_ms"])
         summary["erros"] += entry["status"] == "erro"
-        if stage == "geracao":
+        if stage in ("geracao", "deduplicacao"):
             for field in ("tokens_entrada", "tokens_saida", "custo_estimado"):
                 if field in entry:
                     summary[field] = summary.get(field, 0) + entry[field]
