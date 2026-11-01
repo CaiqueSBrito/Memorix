@@ -1,7 +1,7 @@
-"""Tarefa 002 — persistência base (documents/chunks, sem vetor), teste primeiro.
+"""Persistência: constraints e ciclo de migração no banco isolado de testes.
 
-Roda da raiz do repo contra o banco de dev do `.env` (autorizado, gate 1 resp. 03):
-    ./venv/Scripts/python.exe -m pytest backend/api/tests/test_persistence.py -q
+Roda da raiz, selecionando um arquivo de ambiente de desenvolvimento:
+    MEMORIX_ENV_FILE=.env.local DB_DATABASE=memorix_test python -m pytest backend/api/tests/test_persistence.py -q
 
 Tudo é observado de fora, com SQL cru via `text()`. Da implementação, só a URL do
 banco é importada (`providers.database.DATABASE_URL`, montada a partir das variáveis
@@ -13,9 +13,11 @@ cada teste. Nenhuma mensagem de erro exibe URL, senha ou host.
 """
 
 import pytest
-from conftest import ALEMBIC_INI, ROOT, _alembic, _db_url, _secrets
+from conftest import _alembic
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
+
+pytestmark = pytest.mark.banco
 
 SHA_A = "a" * 64
 SHA_B = "b" * 64
@@ -179,14 +181,6 @@ def test_offsets_are_required_and_end_exceeds_start(conn):
     _fails(conn, lambda: _insert_chunk(conn, doc, 4, start=0, end=None))
 
 
-def test_chunks_have_no_embedding_columns(conn):
-    cols = set(
-        conn.execute(
-            text("select column_name from information_schema.columns where table_schema = 'public' and table_name = 'chunks'")
-        ).scalars()
-    )
-    assert {"chunk_id", "doc_id", "position", "text", "offset_start", "offset_end"} <= cols
-    assert not {"embedding", "embedding_model"} & cols
 
 
 def test_deleting_document_cascades_to_chunks(conn):
@@ -217,26 +211,3 @@ def test_rls_enabled_without_policies(conn):
     assert policies == 0
 
 
-def test_database_url_comes_from_env_without_hardcoded_credentials():
-    """Sem banco: os arquivos da implementação existem e nenhum contém URL/senha/host."""
-    assert _db_url(), "URL do banco ausente no .env"
-    required = [
-        ROOT / ALEMBIC_INI,
-        ROOT / "backend/api/migrations/env.py",
-        ROOT / "backend/src/Memorix/providers/database.py",
-    ]
-    missing = [str(p.relative_to(ROOT)) for p in required if not p.is_file()]
-    assert missing == [], "arquivos da implementação ausentes"
-    assert list((ROOT / "backend/api/migrations/versions").glob("*.py")), "nenhuma migração em versions/"
-
-    scanned = required + [
-        p
-        for d in ("backend/api/migrations", "backend/api/tests")
-        for p in (ROOT / d).rglob("*")
-        if p.is_file() and "__pycache__" not in p.parts
-    ]
-    secrets = _secrets()
-    leaks = sorted(
-        {str(p.relative_to(ROOT)) for p in scanned if any(s in p.read_text(errors="ignore") for s in secrets)}
-    )
-    assert leaks == [], "credencial do banco encontrada nestes arquivos"

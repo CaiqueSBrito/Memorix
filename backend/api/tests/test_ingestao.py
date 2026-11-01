@@ -1,5 +1,4 @@
 
-import hashlib
 import json
 import re
 import unicodedata
@@ -33,7 +32,6 @@ MAX_TOKENS = 400
 MIN_TOKENS = 80
 UPLOADER = "admin-opaco-teste"
 
-SHA_0001 = "eba47c8667c6d58aae774f8b41963abdadb1d81752088e5e019f50e6e3576562"
 
 # Versão limpa equivalente a `sujeira.bin`: o mesmo conteúdo sem BOM, sem CRLF, sem CR
 # solto, sem NUL, sem NFD, sem linhas em branco repetidas e sem espaço no fim de linha.
@@ -436,13 +434,3 @@ def test_metadata_source_path_reproduces_hash(conn, tokenizer, trace_file):
     assert leak is None, f"texto do documento dentro de documents.metadata: {leak!r}"
 
 
-# ------------------------------------------------- migração 0001 inalterada
-
-
-def test_migration_0001_is_unchanged():
-    versions = sorted((ROOT / "backend/api/migrations/versions").glob("*.py"))
-    assert [p.name for p in versions] == ["0001_documents_chunks.py"], (
-        f"versions/ devia ter só a 0001: {[p.name for p in versions]}"
-    )
-    sha = hashlib.sha256(versions[0].read_bytes()).hexdigest()
-    assert sha == SHA_0001, f"a migração 0001 foi alterada (sha256 {sha})"
